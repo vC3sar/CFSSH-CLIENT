@@ -97,7 +97,7 @@ class SshEngine {
     return [];
   }
 
-  Future<SSHSession> startShell(String profileId) async {
+  Future<SSHSession> startShell(String profileId, int cols, int rows) async {
     final state = _activeSessions[profileId];
     if (state == null || state.client == null) {
       throw Exception('Session not connected');
@@ -105,9 +105,10 @@ class SshEngine {
     
     // PTY configuration for professional terminal layout
     state.shell = await state.client!.shell(
-      pty: const SSHPtyConfig(
-        width: 80, 
-        height: 24, 
+      pty: SSHPtyConfig(
+        type: 'xterm-256color',
+        width: cols, 
+        height: rows, 
       )
     );
     

@@ -51,15 +51,24 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         _statusMessage = 'Connected';
       });
 
-      final shell = await _sshEngine.startShell(widget.profile.id);
+      int initialCols = terminal.viewWidth > 0 ? terminal.viewWidth : 80;
+      int initialRows = terminal.viewHeight > 0 ? terminal.viewHeight : 24;
+      
+      final shell = await _sshEngine.startShell(
+        widget.profile.id,
+        initialCols,
+        initialRows,
+      );
 
       // Listen for data from the remote server
-      shell.stdout.listen((data) {
-        if (mounted) terminal.write(utf8.decode(data));
+      // IMPORTANT: utf8.decoder MUST be bound to the stream to maintain state
+      // across TCP chunks, otherwise ANSI escape sequences and multibyte chars get corrupted.
+      shell.stdout.cast<List<int>>().transform(const Utf8Decoder(allowMalformed: true)).listen((String text) {
+        if (mounted) terminal.write(text);
       });
 
-      shell.stderr.listen((data) {
-        if (mounted) terminal.write(utf8.decode(data));
+      shell.stderr.cast<List<int>>().transform(const Utf8Decoder(allowMalformed: true)).listen((String text) {
+        if (mounted) terminal.write(text);
       });
 
       // Send local input to the remote server
@@ -69,7 +78,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       
       // Handle resize (xterm window size changes)
       terminal.onResize = (w, h, pw, ph) {
-        shell.resizeTerminal(w, h);
+        shell.resizeTerminal(w, h, pw, ph);
       };
 
     } catch (e, stackTrace) {
