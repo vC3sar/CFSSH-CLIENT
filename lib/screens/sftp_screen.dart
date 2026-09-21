@@ -84,6 +84,7 @@ class SftpScreen extends ConsumerWidget {
             child: sftpState.isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                     itemCount: sftpState.items.length,
                     itemBuilder: (context, index) {
                       final item = sftpState.items[index];

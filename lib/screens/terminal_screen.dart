@@ -329,6 +329,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       color: AppColors.surface1,
       height: 48,
       child: ListView.builder(
+        physics: const BouncingScrollPhysics(),
         scrollDirection: Axis.horizontal,
         itemCount: keys.length,
         itemBuilder: (context, index) {

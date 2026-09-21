@@ -209,93 +209,109 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           opacity: 0.7,
         ),
       ),
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'CFSSH CLIENT',
-            style: Theme.of(context).textTheme.headlineLarge,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Secure Remote Access',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.electricCyan,
-                ),
-          ),
-          const SizedBox(height: 32),
-          
-          // Dashboard Grid
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: MediaQuery.of(context).size.width >= 1024 ? 4 : 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 2.0,
-            children: [
-              _buildGlassStatCard('ACTIVE', '$activeSessions', AppColors.phosphorGreen),
-              _buildGlassStatCard('SERVERS', '${profilesState.profiles.length}', AppColors.textPrimary),
-            ],
-          ),
-          
-          const SizedBox(height: 32),
-          Text('RECENT CONNECTIONS', style: AppTextStyles.labelMedium),
-          const SizedBox(height: 16),
-          
-          // Recent Connections Feed
-          Expanded(
-            child: historyState.isEmpty
-                ? Center(
-                    child: Text('No recent connections.', style: AppTextStyles.bodyMedium),
-                  )
-                : ListView.builder(
-                    itemCount: historyState.length,
-                    itemBuilder: (context, index) {
-                      final history = historyState[index];
-                      // Find profile
-                      final profile = profilesState.profiles.firstWhere(
-                        (p) => p.id == history.profileId,
-                        orElse: () => profilesState.profiles.first, // Fallback if deleted
-                      );
-                      
-                      // Don't show if profile was deleted
-                      if (!profilesState.profiles.any((p) => p.id == history.profileId)) {
-                        return const SizedBox.shrink();
-                      }
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface1.withValues(alpha: 0.85),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.surfaceBorder.withValues(alpha: 0.5)),
-                        ),
-                        child: ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: AppColors.surface2,
-                            child: Icon(Icons.computer, color: AppColors.electricCyan),
-                          ),
-                          title: Text(profile.name, style: AppTextStyles.titleMedium),
-                          subtitle: Text(
-                            timeago.format(history.timestamp),
-                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
-                          ),
-                          trailing: const Icon(Icons.chevron_right, color: AppColors.textDisabled),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => TerminalScreen(profile: profile),
-                              ),
-                            );
-                          },
-                        ),
-                      );
-                    },
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.all(24.0),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'CFSSH CLIENT',
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Secure Remote Access',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.electricCyan,
+                        ),
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  // Dashboard Grid
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: MediaQuery.of(context).size.width >= 1024 ? 4 : 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 2.0,
+                    children: [
+                      _buildGlassStatCard('ACTIVE', '$activeSessions', AppColors.phosphorGreen),
+                      _buildGlassStatCard('SERVERS', '${profilesState.profiles.length}', AppColors.textPrimary),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 32),
+                  Text('RECENT CONNECTIONS', style: AppTextStyles.labelMedium),
+                  const SizedBox(height: 16),
+                  
+                  if (historyState.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Text('No recent connections.', style: AppTextStyles.bodyMedium),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
+          
+          if (historyState.isNotEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0).copyWith(bottom: 24.0),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final history = historyState[index];
+                    // Find profile
+                    final profile = profilesState.profiles.firstWhere(
+                      (p) => p.id == history.profileId,
+                      orElse: () => profilesState.profiles.first, // Fallback if deleted
+                    );
+                    
+                    // Don't show if profile was deleted
+                    if (!profilesState.profiles.any((p) => p.id == history.profileId)) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface1.withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.surfaceBorder.withValues(alpha: 0.5)),
+                      ),
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: AppColors.surface2,
+                          child: Icon(Icons.computer, color: AppColors.electricCyan),
+                        ),
+                        title: Text(profile.name, style: AppTextStyles.titleMedium),
+                        subtitle: Text(
+                          timeago.format(history.timestamp),
+                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                        ),
+                        trailing: const Icon(Icons.chevron_right, color: AppColors.textDisabled),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TerminalScreen(profile: profile),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                  childCount: historyState.length,
+                ),
+              ),
+            ),
         ],
       ),
     );

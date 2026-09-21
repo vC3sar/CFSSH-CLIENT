@@ -43,6 +43,7 @@ class _KeysScreenState extends ConsumerState<KeysScreen> {
             : keysState.keys.isEmpty
                 ? _buildEmptyState()
                 : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                     padding: const EdgeInsets.all(16.0),
                     itemCount: keysState.keys.length,
                     itemBuilder: (context, index) {

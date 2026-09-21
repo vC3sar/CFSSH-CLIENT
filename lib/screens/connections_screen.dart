@@ -85,6 +85,7 @@ class ConnectionsScreen extends ConsumerWidget {
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: const EdgeInsets.all(16),
       itemCount: profiles.length,
       itemBuilder: (context, index) {
