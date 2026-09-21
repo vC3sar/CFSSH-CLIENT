@@ -81,10 +81,17 @@ htop
 
 ## Screenshots
 
-<!-- Add screenshot here: Server Profiles / Dashboard -->
-<!-- Add screenshot here: Add / Edit Server Profile -->
-<!-- Add screenshot here: Interactive Terminal Session -->
-<!-- Add screenshot here: Mobile Keyboard Toolbar in action -->
+<div align="center">
+
+| Dashboard | Server Profiles |
+| :---: | :---: |
+| <img src="assets/ss4.jpg" width="360" alt="Dashboard" /> | <img src="assets/ss3.jpg" width="360" alt="Server Profiles" /> |
+
+| SFTP File Manager | App Settings |
+| :---: | :---: |
+| <img src="assets/ss2.jpg" width="360" alt="SFTP File Manager" /> | <img src="assets/ss1.jpg" width="360" alt="App Settings" /> |
+
+</div>
 
 ---
 

@@ -160,9 +160,9 @@ class SftpScreen extends ConsumerWidget {
       final result = await FilePicker.pickFiles();
       if (!context.mounted) return;
       
-      if (result != null && result.isNotEmpty && result.single.path != null) {
-        final localPath = result.single.path!;
-        final filename = result.single.name;
+      if (result.isNotEmpty && result.first.path != null) {
+        final localPath = result.first.path!;
+        final filename = result.first.name;
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Uploading $filename...')),

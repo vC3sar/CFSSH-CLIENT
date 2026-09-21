@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -198,35 +197,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          color: AppColors.surface1.withValues(alpha: 0.6),
+                          color: AppColors.surface1.withValues(alpha: 0.85),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.surfaceBorder.withValues(alpha: 0.3)),
+                          border: Border.all(color: AppColors.surfaceBorder.withValues(alpha: 0.5)),
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                            child: ListTile(
-                              leading: const CircleAvatar(
-                                backgroundColor: AppColors.surface2,
-                                child: Icon(Icons.computer, color: AppColors.electricCyan),
-                              ),
-                              title: Text(profile.name, style: AppTextStyles.titleMedium),
-                              subtitle: Text(
-                                timeago.format(history.timestamp),
-                                style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
-                              ),
-                              trailing: const Icon(Icons.chevron_right, color: AppColors.textDisabled),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => TerminalScreen(profile: profile),
-                                  ),
-                                );
-                              },
-                            ),
+                        child: ListTile(
+                          leading: const CircleAvatar(
+                            backgroundColor: AppColors.surface2,
+                            child: Icon(Icons.computer, color: AppColors.electricCyan),
                           ),
+                          title: Text(profile.name, style: AppTextStyles.titleMedium),
+                          subtitle: Text(
+                            timeago.format(history.timestamp),
+                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                          ),
+                          trailing: const Icon(Icons.chevron_right, color: AppColors.textDisabled),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => TerminalScreen(profile: profile),
+                              ),
+                            );
+                          },
                         ),
                       );
                     },
@@ -240,37 +233,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget _buildGlassStatCard(String title, String value, Color valueColor) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface1.withValues(alpha: 0.5),
+        color: AppColors.surface1.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.surfaceBorder.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.surfaceBorder.withValues(alpha: 0.5)),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: valueColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
-          ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: valueColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ),
     );

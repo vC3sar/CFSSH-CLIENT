@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:state_notifier/state_notifier.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:dartssh2/dartssh2.dart';
 import '../models/connection_profile.dart';
 import '../providers/ssh_provider.dart';
@@ -68,7 +68,7 @@ class SftpNotifier extends StateNotifier<SftpState> {
       String startPath = state.currentPath;
       if (startPath == '.') {
         try {
-           final rp = await _sftpClient!.stat('.');
+          await _sftpClient!.stat('.');
         } catch (_) {}
       }
       
@@ -110,7 +110,7 @@ class SftpNotifier extends StateNotifier<SftpState> {
     parts.removeWhere((p) => p.isEmpty);
     if (parts.isNotEmpty) parts.removeLast();
     
-    String newPath = '/' + parts.join('/');
+    String newPath = '/${parts.join('/')}';
     if (newPath == '/') newPath = '/';
     if (state.currentPath == '.' && parts.isEmpty) newPath = '.';
     
