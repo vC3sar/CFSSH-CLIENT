@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/connection_profile.dart';
 import '../models/connection_history.dart';
+import '../models/ssh_key_model.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._init();
@@ -21,22 +22,35 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    const idType = 'TEXT PRIMARY KEY';
+    const textType = 'TEXT NOT NULL';
+
     if (oldVersion < 2) {
-      const idType = 'TEXT PRIMARY KEY';
-      const textType = 'TEXT NOT NULL';
-      
       await db.execute('''
       CREATE TABLE connection_history (
         id $idType,
         profileId $textType,
         timestamp $textType
+      )
+      ''');
+    }
+
+    if (oldVersion < 3) {
+      await db.execute('''
+      CREATE TABLE ssh_keys (
+        id $idType,
+        name $textType,
+        keyType $textType,
+        publicKey $textType,
+        fingerprint $textType,
+        createdAt $textType
       )
       ''');
     }
@@ -69,6 +83,17 @@ CREATE TABLE connection_history (
   id $idType,
   profileId $textType,
   timestamp $textType
+)
+''');
+
+    await db.execute('''
+CREATE TABLE ssh_keys (
+  id $idType,
+  name $textType,
+  keyType $textType,
+  publicKey $textType,
+  fingerprint $textType,
+  createdAt $textType
 )
 ''');
   }
@@ -116,6 +141,12 @@ CREATE TABLE connection_history (
   // History Methods
   Future<void> insertHistory(ConnectionHistory history) async {
     final db = await instance.database;
+    // Remove previous entries for the same profileId to avoid duplicates
+    await db.delete(
+      'connection_history',
+      where: 'profileId = ?',
+      whereArgs: [history.profileId],
+    );
     await db.insert(
       'connection_history',
       history.toMap(),
@@ -133,8 +164,47 @@ CREATE TABLE connection_history (
     return result.map((json) => ConnectionHistory.fromMap(json)).toList();
   }
 
+  // SSH Key Methods
+  Future<void> insertSshKey(SshKeyModel key) async {
+    final db = await instance.database;
+    await db.insert(
+      'ssh_keys',
+      key.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<SshKeyModel>> getAllSshKeys() async {
+    final db = await instance.database;
+    final result = await db.query('ssh_keys', orderBy: 'createdAt DESC');
+    return result.map((json) => SshKeyModel.fromMap(json)).toList();
+  }
+
+  Future<SshKeyModel?> getSshKeyById(String id) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'ssh_keys',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (result.isNotEmpty) {
+      return SshKeyModel.fromMap(result.first);
+    }
+    return null;
+  }
+
+  Future<void> deleteSshKey(String id) async {
+    final db = await instance.database;
+    await db.delete(
+      'ssh_keys',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<void> close() async {
     final db = await instance.database;
     db.close();
   }
 }
+

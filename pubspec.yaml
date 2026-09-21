@@ -47,6 +47,7 @@ dependencies:
   uuid: ^4.6.0
   timeago: ^3.7.1
   state_notifier: ^1.0.0
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:

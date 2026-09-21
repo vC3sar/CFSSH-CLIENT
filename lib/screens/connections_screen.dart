@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/connection_provider.dart';
+import '../providers/keys_provider.dart';
 import '../models/connection_profile.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'terminal_screen.dart';
+import 'keys_screen.dart';
 import '../security/secure_storage.dart';
 
 class ConnectionsScreen extends ConsumerWidget {
@@ -22,10 +24,19 @@ class ConnectionsScreen extends ConsumerWidget {
         title: const Text('Connection Manager'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.key, color: AppColors.electricCyan),
+            tooltip: 'SSH Keys',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const KeysScreen()),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'New Connection',
             onPressed: () {
-              // Show dialog or navigate to create new connection profile
               _showProfileEditor(context, ref, null);
             },
           ),
@@ -36,7 +47,7 @@ class ConnectionsScreen extends ConsumerWidget {
           image: DecorationImage(
             image: AssetImage(bgImage),
             fit: BoxFit.cover,
-            opacity: 0.7, // Increased opacity so the dark image is visible
+            opacity: 0.7,
           ),
         ),
         child: _buildBody(context, ref, provider),
@@ -157,23 +168,23 @@ class ConnectionsScreen extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       builder: (context) {
-        return _ProfileEditor(profile: profile, ref: ref);
+        return _ProfileEditor(profile: profile, parentRef: ref);
       },
     );
   }
 }
 
-class _ProfileEditor extends StatefulWidget {
+class _ProfileEditor extends ConsumerStatefulWidget {
   final ConnectionProfile? profile;
-  final WidgetRef ref;
+  final WidgetRef parentRef;
 
-  const _ProfileEditor({this.profile, required this.ref});
+  const _ProfileEditor({this.profile, required this.parentRef});
 
   @override
-  State<_ProfileEditor> createState() => _ProfileEditorState();
+  ConsumerState<_ProfileEditor> createState() => _ProfileEditorState();
 }
 
-class _ProfileEditorState extends State<_ProfileEditor> {
+class _ProfileEditorState extends ConsumerState<_ProfileEditor> {
   final _nameController = TextEditingController();
   final _hostController = TextEditingController();
   final _userController = TextEditingController();
@@ -181,6 +192,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
   final _portController = TextEditingController(text: '22');
   bool _obscurePassword = true;
   String _authMethod = 'password';
+  String? _selectedKeyId;
 
   @override
   void initState() {
@@ -191,6 +203,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
       _userController.text = widget.profile!.username;
       _portController.text = widget.profile!.port.toString();
       _authMethod = widget.profile!.authMethod;
+      _selectedKeyId = widget.profile!.privateKeyId;
     }
   }
 
@@ -223,20 +236,21 @@ class _ProfileEditorState extends State<_ProfileEditor> {
       port: port,
       username: user,
       authMethod: _authMethod,
+      privateKeyId: _authMethod == 'private_key' ? _selectedKeyId : null,
       createdAt: widget.profile?.createdAt ?? DateTime.now(),
       lastConnected: widget.profile?.lastConnected ?? DateTime.now(),
     );
 
     // Save password asynchronously if provided
-    if (pass.isNotEmpty) {
+    if (pass.isNotEmpty && _authMethod == 'password') {
       final secureStorage = SecureStorage();
       await secureStorage.savePassword(id, pass);
     }
 
     if (widget.profile == null) {
-      widget.ref.read(connectionProfilesProvider.notifier).addProfile(newProfile);
+      widget.parentRef.read(connectionProfilesProvider.notifier).addProfile(newProfile);
     } else {
-      widget.ref.read(connectionProfilesProvider.notifier).updateProfile(newProfile);
+      widget.parentRef.read(connectionProfilesProvider.notifier).updateProfile(newProfile);
     }
 
     if (mounted) {
@@ -246,6 +260,8 @@ class _ProfileEditorState extends State<_ProfileEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final keysState = ref.watch(keysProvider);
+
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -253,90 +269,152 @@ class _ProfileEditorState extends State<_ProfileEditor> {
         right: 24,
         top: 24,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            widget.profile == null ? 'New Connection' : 'Edit Connection',
-            style: AppTextStyles.headlineMedium,
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(labelText: 'Name (e.g. Production VPS)'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _hostController,
-            decoration: const InputDecoration(labelText: 'Host (IP or Domain)'),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _userController,
-                  decoration: const InputDecoration(labelText: 'Username'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _portController,
-                  decoration: const InputDecoration(labelText: 'Port', hintText: '22'),
-                  keyboardType: TextInputType.number,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: _authMethod,
-            decoration: const InputDecoration(labelText: 'Authentication Method'),
-            items: const [
-              DropdownMenuItem(value: 'password', child: Text('Password')),
-              DropdownMenuItem(value: 'private_key', child: Text('Private Key')),
-            ],
-            onChanged: (val) {
-              if (val != null) {
-                setState(() => _authMethod = val);
-              }
-            },
-          ),
-          if (_authMethod == 'password') ...[
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.profile == null ? 'New Connection' : 'Edit Connection',
+              style: AppTextStyles.headlineMedium,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Name (e.g. Production VPS)'),
+            ),
             const SizedBox(height: 12),
             TextField(
-              controller: _passwordController,
-              decoration: InputDecoration(
-                labelText: 'Password', 
-                hintText: 'Leave blank to keep existing',
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                    color: AppColors.textDisabled,
+              controller: _hostController,
+              decoration: const InputDecoration(labelText: 'Host (IP or Domain)'),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _userController,
+                    decoration: const InputDecoration(labelText: 'Username'),
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _obscurePassword = !_obscurePassword;
-                    });
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _portController,
+                    decoration: const InputDecoration(labelText: 'Port', hintText: '22'),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              initialValue: _authMethod,
+              decoration: const InputDecoration(labelText: 'Authentication Method'),
+              dropdownColor: AppColors.surface2,
+              items: const [
+                DropdownMenuItem(value: 'password', child: Text('Password')),
+                DropdownMenuItem(value: 'private_key', child: Text('Private Key')),
+              ],
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() => _authMethod = val);
+                }
+              },
+            ),
+            if (_authMethod == 'password') ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _passwordController,
+                decoration: InputDecoration(
+                  labelText: 'Password', 
+                  hintText: 'Leave blank to keep existing',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                      color: AppColors.textDisabled,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
+                ),
+                obscureText: _obscurePassword,
+              ),
+            ] else if (_authMethod == 'private_key') ...[
+              const SizedBox(height: 12),
+              if (keysState.keys.isEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.surfaceBorder),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text('No SSH Keys available in key manager.'),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const KeysScreen()),
+                          );
+                        },
+                        icon: const Icon(Icons.key, color: AppColors.electricCyan),
+                        label: const Text('Generate / Import Key', style: TextStyle(color: AppColors.electricCyan)),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedKeyId != null && keysState.keys.any((k) => k.id == _selectedKeyId)
+                      ? _selectedKeyId
+                      : keysState.keys.first.id,
+                  decoration: const InputDecoration(labelText: 'Select SSH Key'),
+                  dropdownColor: AppColors.surface2,
+                  items: keysState.keys.map((key) {
+                    return DropdownMenuItem<String>(
+                      value: key.id,
+                      child: Text('${key.name} (${key.keyType})'),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    setState(() => _selectedKeyId = val);
                   },
                 ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const KeysScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.key, size: 16, color: AppColors.electricCyan),
+                    label: const Text('Manage Keys', style: TextStyle(color: AppColors.electricCyan, fontSize: 12)),
+                  ),
+                ),
+              ],
+            ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _save,
+                child: const Text('Save'),
               ),
-              obscureText: _obscurePassword,
             ),
+            const SizedBox(height: 24),
           ],
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _save,
-              child: const Text('Save'),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
+        ),
       ),
     );
   }
 }
+

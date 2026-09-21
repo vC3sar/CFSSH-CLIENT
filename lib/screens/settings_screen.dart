@@ -4,6 +4,7 @@ import '../providers/settings_provider.dart';
 import '../security/secure_storage.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import 'keys_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -91,6 +92,19 @@ class SettingsScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: Column(
                 children: [
+                  ListTile(
+                    leading: const Icon(Icons.key, color: AppColors.electricCyan),
+                    title: const Text('SSH Key Manager'),
+                    subtitle: const Text('Generate, import, export & manage SSH key pairs'),
+                    trailing: const Icon(Icons.chevron_right, color: AppColors.textDisabled),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const KeysScreen()),
+                      );
+                    },
+                  ),
+                  const Divider(color: AppColors.surfaceBorder, height: 1),
                   ListTile(
                     title: const Text('Clear Saved Credentials', style: TextStyle(color: AppColors.softCrimson)),
                     subtitle: const Text('Wipes all passwords and keys from secure storage'),

@@ -50,76 +50,147 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           const SizedBox(height: 16),
           Text('CFSSH', style: AppTextStyles.headlineMedium),
           const SizedBox(height: 32),
-          _buildSidebarItem(Icons.dashboard, 'Dashboard', 0),
-          _buildSidebarItem(Icons.dns, 'Servers', 1),
-          _buildSidebarItem(Icons.folder_shared, 'Files', 2),
+          _buildSidebarItem(Icons.dashboard_outlined, Icons.dashboard, 'Dashboard', 0),
+          _buildSidebarItem(Icons.dns_outlined, Icons.dns, 'Servers', 1),
+          _buildSidebarItem(Icons.folder_shared_outlined, Icons.folder_shared, 'Files', 2),
           const Spacer(),
-          _buildSidebarItem(Icons.settings, 'Settings', 3),
+          _buildSidebarItem(Icons.settings_outlined, Icons.settings, 'Settings', 3),
           const SizedBox(height: 16),
         ],
       ),
     );
   }
 
-  Widget _buildSidebarItem(IconData icon, String label, int index) {
+  Widget _buildSidebarItem(IconData iconUnselected, IconData iconSelected, String label, int index) {
     final isSelected = _selectedIndex == index;
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected ? AppColors.electricCyan : AppColors.textSecondary,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeInOut,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: isSelected ? AppColors.surface2 : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
       ),
-      title: Text(
-        label,
-        style: AppTextStyles.titleMedium.copyWith(
-          color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        leading: Icon(
+          isSelected ? iconSelected : iconUnselected,
+          color: isSelected ? AppColors.electricCyan : AppColors.textSecondary,
         ),
+        title: Text(
+          label,
+          style: AppTextStyles.titleMedium.copyWith(
+            color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+          ),
+        ),
+        selected: isSelected,
+        onTap: () {
+          if (_selectedIndex != index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          }
+        },
       ),
-      selected: isSelected,
-      selectedTileColor: AppColors.surface2,
-      onTap: () {
-        setState(() {
-          _selectedIndex = index;
-        });
-      },
     );
   }
 
   Widget _buildBottomNav() {
     return Container(
+      height: 64,
       decoration: const BoxDecoration(
+        color: AppColors.surface1,
         border: Border(
-          top: BorderSide(color: AppColors.surfaceBorder),
+          top: BorderSide(color: AppColors.surfaceBorder, width: 0.8),
         ),
       ),
-      child: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        backgroundColor: AppColors.surface1,
-        selectedItemColor: AppColors.electricCyan,
-        unselectedItemColor: AppColors.textSecondary,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-          BottomNavigationBarItem(icon: Icon(Icons.dns), label: 'Servers'),
-          BottomNavigationBarItem(icon: Icon(Icons.folder_shared), label: 'Files'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildNavItem(0, Icons.dashboard_outlined, Icons.dashboard, 'Dashboard'),
+          _buildNavItem(1, Icons.dns_outlined, Icons.dns, 'Servers'),
+          _buildNavItem(2, Icons.folder_shared_outlined, Icons.folder_shared, 'Files'),
+          _buildNavItem(3, Icons.settings_outlined, Icons.settings, 'Settings'),
         ],
       ),
     );
   }
 
+  Widget _buildNavItem(int index, IconData iconUnselected, IconData iconSelected, String label) {
+    final isSelected = _selectedIndex == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          if (_selectedIndex != index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          }
+        },
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Minimalist active top bar line
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeInOut,
+              height: 3,
+              width: isSelected ? 24 : 0,
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.electricCyan : Colors.transparent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Icon(
+              isSelected ? iconSelected : iconUnselected,
+              color: isSelected ? AppColors.electricCyan : AppColors.textSecondary,
+              size: 22,
+            ),
+            const SizedBox(height: 4),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeInOut,
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected ? AppColors.electricCyan : AppColors.textSecondary,
+              ),
+              child: Text(label),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMainContent() {
-    if (_selectedIndex == 1) {
-      return const ConnectionsScreen();
-    } else if (_selectedIndex == 2) {
-      return const SftpSelectorScreen();
-    } else if (_selectedIndex == 3) {
-      return const SettingsScreen();
-    }
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 150),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+      child: KeyedSubtree(
+        key: ValueKey<int>(_selectedIndex),
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: [
+            _buildDashboardHome(),
+            const ConnectionsScreen(),
+            const SftpSelectorScreen(),
+            const SettingsScreen(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardHome() {
     
     final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
     final bgImage = isPortrait ? 'assets/background_vertical.png' : 'assets/background_horizontal.png';
