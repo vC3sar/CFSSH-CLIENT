@@ -291,9 +291,7 @@ class _KeysScreenState extends ConsumerState<KeysScreen> {
 
   void _showGenerateKeyDialog(BuildContext context) {
     final nameCtrl = TextEditingController(text: 'My Ed25519 Key');
-    final passphraseCtrl = TextEditingController();
     final commentCtrl = TextEditingController(text: 'cfssh-user');
-    String selectedType = 'ED25519';
     bool isGenerating = false;
 
     showDialog(
@@ -317,29 +315,23 @@ class _KeysScreenState extends ConsumerState<KeysScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedType,
-                      decoration: const InputDecoration(labelText: 'Key Algorithm'),
-                      dropdownColor: AppColors.surface2,
-                      items: const [
-                        DropdownMenuItem(value: 'ED25519', child: Text('Ed25519 (Recommended - Fast & Secure)')),
-                        DropdownMenuItem(value: 'RSA_2048', child: Text('RSA (2048-bit)')),
-                        DropdownMenuItem(value: 'RSA_4096', child: Text('RSA (4096-bit)')),
-                        DropdownMenuItem(value: 'ECDSA', child: Text('ECDSA (P-256)')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setModalState(() => selectedType = val);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: passphraseCtrl,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Passphrase (Optional)',
-                        hintText: 'Leave empty for no passphrase',
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface2,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.security, color: AppColors.electricCyan, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Will generate a modern, secure Ed25519 key pair without passphrase.',
+                              style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -367,7 +359,7 @@ class _KeysScreenState extends ConsumerState<KeysScreen> {
                           setModalState(() => isGenerating = true);
                           try {
                             final generated = await KeyGeneratorService.generateKey(
-                              keyType: selectedType,
+                              keyType: 'ED25519',
                               comment: commentCtrl.text.trim(),
                             );
 
@@ -383,7 +375,7 @@ class _KeysScreenState extends ConsumerState<KeysScreen> {
                             await ref.read(keysProvider.notifier).saveKey(
                                   keyModel: keyModel,
                                   privateKeyPem: generated.privateKeyPem,
-                                  passphrase: passphraseCtrl.text.isNotEmpty ? passphraseCtrl.text : null,
+                                  passphrase: null,
                                 );
 
                             if (context.mounted) {

@@ -49,6 +49,7 @@ dependencies:
   state_notifier: ^1.0.0
   crypto: ^3.0.3
   cryptography: ^2.9.0
+  pointycastle: ^4.0.0
 
 dev_dependencies:
   flutter_test:

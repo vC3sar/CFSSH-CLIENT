@@ -277,6 +277,37 @@ class _ProfileEditorState extends ConsumerState<_ProfileEditor> {
     }
   }
 
+  void _confirmDelete() async {
+    if (widget.profile == null) return;
+    
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface1,
+        title: const Text('Delete Server'),
+        content: Text('Are you sure you want to delete "${widget.profile!.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.softCrimson),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      widget.parentRef.read(connectionProfilesProvider.notifier).deleteProfile(widget.profile!.id);
+      if (mounted) {
+        Navigator.pop(context); // close bottom sheet
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Server deleted'), backgroundColor: AppColors.surfaceBorder),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final keysState = ref.watch(keysProvider);
@@ -422,12 +453,33 @@ class _ProfileEditorState extends ConsumerState<_ProfileEditor> {
               ],
             ],
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _save,
-                child: const Text('Save'),
-              ),
+            Row(
+              children: [
+                if (widget.profile != null) ...[
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.softCrimson,
+                        side: const BorderSide(color: AppColors.softCrimson),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      onPressed: _confirmDelete,
+                      child: const Text('Delete'),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                ],
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    onPressed: _save,
+                    child: const Text('Save'),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
           ],
