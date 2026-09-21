@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/connection_provider.dart';
-import '../models/connection_profile.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'sftp_screen.dart';
