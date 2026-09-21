@@ -132,19 +132,33 @@ class ConnectionsScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            title: Text(profile.name, style: AppTextStyles.titleMedium),
+            title: Text(
+              profile.name,
+              style: AppTextStyles.titleMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             subtitle: Text(
               '${profile.username}@${profile.host}:${profile.port}',
               style: AppTextStyles.monoSmall,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.edit, size: 20),
+                  icon: const Icon(Icons.edit, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Edit Server',
                   onPressed: () => _showProfileEditor(context, ref, profile),
                 ),
+                const SizedBox(width: 8),
                 ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -229,6 +243,11 @@ class _ProfileEditorState extends ConsumerState<_ProfileEditor> {
     final port = int.tryParse(portStr) ?? 22;
     final id = widget.profile?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
 
+    final keysState = ref.read(keysProvider);
+    final effectiveKeyId = (_selectedKeyId != null && keysState.keys.any((k) => k.id == _selectedKeyId))
+        ? _selectedKeyId
+        : (keysState.keys.isNotEmpty ? keysState.keys.first.id : null);
+
     final newProfile = ConnectionProfile(
       id: id,
       name: name,
@@ -236,7 +255,7 @@ class _ProfileEditorState extends ConsumerState<_ProfileEditor> {
       port: port,
       username: user,
       authMethod: _authMethod,
-      privateKeyId: _authMethod == 'private_key' ? _selectedKeyId : null,
+      privateKeyId: _authMethod == 'private_key' ? effectiveKeyId : null,
       createdAt: widget.profile?.createdAt ?? DateTime.now(),
       lastConnected: widget.profile?.lastConnected ?? DateTime.now(),
     );

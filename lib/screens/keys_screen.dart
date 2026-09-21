@@ -445,7 +445,7 @@ class _KeysScreenState extends ConsumerState<KeysScreen> {
                     OutlinedButton.icon(
                       onPressed: () async {
                         final result = await FilePicker.pickFiles();
-                        if (result != null && result.isNotEmpty && result.first.path != null) {
+                        if (result.isNotEmpty && result.first.path != null) {
                           final file = File(result.first.path!);
                           final content = await file.readAsString();
                           keyContentCtrl.text = content;

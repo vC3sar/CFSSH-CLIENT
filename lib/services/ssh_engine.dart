@@ -87,12 +87,24 @@ class SshEngine {
   }
 
   Future<List<SSHKeyPair>> _getIdentities(ConnectionProfile profile) async {
+    debugPrint('SSH_ENGINE: _getIdentities for "${profile.name}" (authMethod: ${profile.authMethod}, keyId: ${profile.privateKeyId})');
     if (profile.authMethod == 'private_key' && profile.privateKeyId != null) {
       final pk = await _secureStorage.getPrivateKey(profile.privateKeyId!);
       final pass = await _secureStorage.getPassphrase(profile.privateKeyId!);
+      debugPrint('SSH_ENGINE: Storage query result - Key exists: ${pk != null}, length: ${pk?.length}, hasPassphrase: ${pass != null}');
       if (pk != null) {
-        return SSHKeyPair.fromPem(pk, pass);
+        try {
+          final keys = SSHKeyPair.fromPem(pk, pass);
+          debugPrint('SSH_ENGINE: Successfully parsed ${keys.length} SSH key identity(ies).');
+          return keys;
+        } catch (e, st) {
+          debugPrint('SSH_ENGINE ERROR parsing SSHKeyPair: $e\n$st');
+        }
+      } else {
+        debugPrint('SSH_ENGINE WARNING: Key file not found in secure storage for keyId: ${profile.privateKeyId}');
       }
+    } else {
+      debugPrint('SSH_ENGINE INFO: authMethod is "${profile.authMethod}" or privateKeyId is null.');
     }
     return [];
   }

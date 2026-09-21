@@ -131,15 +131,26 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
           _statusMessage = 'Error';
         });
         
-        String userMsg = e.toString();
-        if (userMsg.contains('SSHAuthFailError')) {
-          userMsg = 'Authentication failed. Check username, password or SSH key.';
-        } else if (userMsg.contains('SocketException')) {
-          userMsg = 'Network error. Host unreachable or connection refused.';
+        String rawErr = e.toString();
+        String userMsg;
+        String tipMsg;
+
+        if (rawErr.contains('Connection refused') || rawErr.contains('errno = 111')) {
+          userMsg = 'Connection refused by ${widget.profile.host}:${widget.profile.port}';
+          tipMsg = 'Check if SSH daemon (sshd) is running on port ${widget.profile.port} and firewall allows incoming connections.';
+        } else if (rawErr.contains('timed out') || rawErr.contains('TimeoutException')) {
+          userMsg = 'Connection timed out connecting to ${widget.profile.host}:${widget.profile.port}';
+          tipMsg = 'Check host IP/domain, server power, and network firewall settings.';
+        } else if (rawErr.contains('SSHAuthFailError')) {
+          userMsg = 'Authentication failed for user "${widget.profile.username}"';
+          tipMsg = 'Verify password or check that public key is added to ~/.ssh/authorized_keys on the remote server.';
+        } else {
+          userMsg = rawErr.replaceAll('Exception: ', '');
+          tipMsg = 'Edit this connection profile in Servers to verify host, port, and credentials.';
         }
         
         terminal.write('\r\n\x1B[1;31mError:\x1B[0m $userMsg\r\n');
-        terminal.write('\r\n\x1B[1;33mStackTrace:\x1B[0m\r\n$stackTrace\r\n');
+        terminal.write('\x1B[1;33mTip:\x1B[0m $tipMsg\r\n\r\n');
       }
     }
   }
@@ -160,8 +171,13 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
           children: [
             const Icon(Icons.terminal, size: 20, color: AppColors.electricCyan),
             const SizedBox(width: 8),
-            Text(widget.profile.name),
-            const SizedBox(width: 16),
+            Flexible(
+              child: Text(
+                widget.profile.name,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 12),
             _buildStatusBadge(),
           ],
         ),
