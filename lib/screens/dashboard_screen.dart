@@ -104,9 +104,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (_selectedIndex == 1) {
       return const ConnectionsScreen();
     }
+    
+    final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
+    final bgImage = isPortrait ? 'assets/background_vertical.png' : 'assets/background_horizontal.png';
 
     return Container(
-      color: AppColors.canvasBase,
+      decoration: BoxDecoration(
+        color: AppColors.canvasBase,
+        image: DecorationImage(
+          image: AssetImage(bgImage),
+          fit: BoxFit.cover,
+          opacity: 0.7,
+        ),
+      ),
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

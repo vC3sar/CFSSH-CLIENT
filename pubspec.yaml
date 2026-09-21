@@ -73,7 +73,8 @@ flutter:
   assets:
     - assets/background_vertical.png
     - assets/background_horizontal.png
-    - assets/splash.png
+    - assets/splash_vertical.png
+    - assets/splash_horizontal.png
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
