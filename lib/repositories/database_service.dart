@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/connection_profile.dart';
+import '../models/connection_history.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._init();
@@ -20,9 +21,25 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
+  }
+
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      const idType = 'TEXT PRIMARY KEY';
+      const textType = 'TEXT NOT NULL';
+      
+      await db.execute('''
+      CREATE TABLE connection_history (
+        id $idType,
+        profileId $textType,
+        timestamp $textType
+      )
+      ''');
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -44,6 +61,14 @@ CREATE TABLE profiles (
   keepalive $intType,
   createdAt $textType,
   lastConnected $textType
+)
+''');
+
+    await db.execute('''
+CREATE TABLE connection_history (
+  id $idType,
+  profileId $textType,
+  timestamp $textType
 )
 ''');
   }
@@ -80,6 +105,32 @@ CREATE TABLE profiles (
       where: 'id = ?',
       whereArgs: [id],
     );
+    // Also delete history
+    await db.delete(
+      'connection_history',
+      where: 'profileId = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // History Methods
+  Future<void> insertHistory(ConnectionHistory history) async {
+    final db = await instance.database;
+    await db.insert(
+      'connection_history',
+      history.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<ConnectionHistory>> getRecentHistory({int limit = 10}) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'connection_history',
+      orderBy: 'timestamp DESC',
+      limit: limit,
+    );
+    return result.map((json) => ConnectionHistory.fromMap(json)).toList();
   }
 
   Future<void> close() async {

@@ -78,12 +78,48 @@ class ConnectionsScreen extends ConsumerWidget {
       itemCount: profiles.length,
       itemBuilder: (context, index) {
         final profile = profiles[index];
+        final status = state.statuses[profile.id] ?? ServerStatus.checking;
+
+        Widget statusIcon;
+        switch (status) {
+          case ServerStatus.online:
+            statusIcon = const Icon(Icons.check_circle, size: 12, color: AppColors.phosphorGreen);
+            break;
+          case ServerStatus.offline:
+            statusIcon = const Icon(Icons.cancel, size: 12, color: AppColors.softCrimson);
+            break;
+          case ServerStatus.checking:
+            statusIcon = const SizedBox(
+              width: 10,
+              height: 10,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.grey),
+            );
+            break;
+        }
+
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            leading: const CircleAvatar(
-              backgroundColor: AppColors.surface1,
-              child: Icon(Icons.computer, color: AppColors.electricCyan),
+            leading: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const CircleAvatar(
+                  backgroundColor: AppColors.surface1,
+                  child: Icon(Icons.computer, color: AppColors.electricCyan),
+                ),
+                Positioned(
+                  right: -2,
+                  bottom: -2,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: AppColors.surface2,
+                      shape: BoxShape.circle,
+                    ),
+                    child: statusIcon,
+                  ),
+                ),
+              ],
             ),
             title: Text(profile.name, style: AppTextStyles.titleMedium),
             subtitle: Text(
