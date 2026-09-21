@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:dartssh2/dartssh2.dart';
 import '../models/connection_profile.dart';
 import '../security/secure_storage.dart';
+import '../repositories/database_service.dart';
 
 class SshSessionState {
   final ConnectionProfile profile;
@@ -52,13 +53,13 @@ class SshEngine {
       );
 
       final pass = profile.authMethod == 'password' 
-          ? await _secureStorage.getPassword(profile.id) 
+          ? (await _secureStorage.getPassword(profile.id) ?? '')
           : null;
       
       final identities = await _getIdentities(profile);
 
-      if (pass == null && identities.isEmpty) {
-        throw Exception('No authentication credentials configured.');
+      if (profile.authMethod == 'private_key' && identities.isEmpty) {
+        throw Exception('No SSH Key selected or private key could not be loaded. Please assign a valid key in Servers.');
       }
 
       state.client = SSHClient(
@@ -66,8 +67,8 @@ class SshEngine {
         username: profile.username,
         keepAliveInterval: profile.keepalive > 0 ? Duration(seconds: profile.keepalive) : null,
         identities: identities,
-        onPasswordRequest: (pass != null && pass.isNotEmpty)
-            ? () => pass
+        onPasswordRequest: profile.authMethod == 'password'
+            ? () => pass ?? ''
             : null,
       );
 
@@ -88,23 +89,44 @@ class SshEngine {
 
   Future<List<SSHKeyPair>> _getIdentities(ConnectionProfile profile) async {
     debugPrint('SSH_ENGINE: _getIdentities for "${profile.name}" (authMethod: ${profile.authMethod}, keyId: ${profile.privateKeyId})');
-    if (profile.authMethod == 'private_key' && profile.privateKeyId != null) {
-      final pk = await _secureStorage.getPrivateKey(profile.privateKeyId!);
-      final pass = await _secureStorage.getPassphrase(profile.privateKeyId!);
-      debugPrint('SSH_ENGINE: Storage query result - Key exists: ${pk != null}, length: ${pk?.length}, hasPassphrase: ${pass != null}');
-      if (pk != null) {
-        try {
-          final keys = SSHKeyPair.fromPem(pk, pass);
-          debugPrint('SSH_ENGINE: Successfully parsed ${keys.length} SSH key identity(ies).');
-          return keys;
-        } catch (e, st) {
-          debugPrint('SSH_ENGINE ERROR parsing SSHKeyPair: $e\n$st');
+    if (profile.authMethod == 'private_key') {
+      // 1. Attempt to load the specifically selected key if provided
+      if (profile.privateKeyId != null) {
+        final pk = await _secureStorage.getPrivateKey(profile.privateKeyId!);
+        final pass = await _secureStorage.getPassphrase(profile.privateKeyId!);
+        if (pk != null) {
+          try {
+            final keys = SSHKeyPair.fromPem(pk, pass);
+            if (keys.isNotEmpty) {
+              debugPrint('SSH_ENGINE: Loaded ${keys.length} identity(ies) for specified keyId: ${profile.privateKeyId}');
+              return keys;
+            }
+          } catch (e, st) {
+            debugPrint('SSH_ENGINE ERROR parsing primary keyId ${profile.privateKeyId}: $e\n$st');
+          }
         }
-      } else {
-        debugPrint('SSH_ENGINE WARNING: Key file not found in secure storage for keyId: ${profile.privateKeyId}');
       }
-    } else {
-      debugPrint('SSH_ENGINE INFO: authMethod is "${profile.authMethod}" or privateKeyId is null.');
+
+      // 2. FALLBACK (like Bitvise): If no specific key or key file missing, try all keys saved in Key Manager
+      final allKeys = await DatabaseService.instance.getAllSshKeys();
+      debugPrint('SSH_ENGINE: Attempting fallback with all saved SSH keys in Key Manager (count: ${allKeys.length}).');
+      final List<SSHKeyPair> fallbackIdentities = [];
+      for (final keyModel in allKeys) {
+        final pk = await _secureStorage.getPrivateKey(keyModel.id);
+        final pass = await _secureStorage.getPassphrase(keyModel.id);
+        if (pk != null) {
+          try {
+            final parsed = SSHKeyPair.fromPem(pk, pass);
+            fallbackIdentities.addAll(parsed);
+          } catch (e) {
+            debugPrint('SSH_ENGINE ERROR parsing fallback key "${keyModel.name}": $e');
+          }
+        }
+      }
+      if (fallbackIdentities.isNotEmpty) {
+        debugPrint('SSH_ENGINE: Successfully loaded ${fallbackIdentities.length} fallback SSH key identity(ies).');
+        return fallbackIdentities;
+      }
     }
     return [];
   }

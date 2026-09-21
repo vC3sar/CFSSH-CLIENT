@@ -260,8 +260,8 @@ class _ProfileEditorState extends ConsumerState<_ProfileEditor> {
       lastConnected: widget.profile?.lastConnected ?? DateTime.now(),
     );
 
-    // Save password asynchronously if provided
-    if (pass.isNotEmpty && _authMethod == 'password') {
+    // Save password asynchronously if authMethod is password
+    if (_authMethod == 'password') {
       final secureStorage = SecureStorage();
       await secureStorage.savePassword(id, pass);
     }

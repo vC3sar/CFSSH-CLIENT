@@ -366,23 +366,23 @@ class _KeysScreenState extends ConsumerState<KeysScreen> {
                           if (nameCtrl.text.trim().isEmpty) return;
                           setModalState(() => isGenerating = true);
                           try {
-                            // Basic SSH Key generator template
-                            final pubKeyMock = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI${const Uuid().v4().replaceAll('-', '')} ${commentCtrl.text.trim()}';
-                            final fingerprint = KeyGeneratorService.calculateFingerprint(pubKeyMock);
-                            final privKeyMock = '-----BEGIN OPENSSH PRIVATE KEY-----\n${const Uuid().v4()}\n-----END OPENSSH PRIVATE KEY-----';
+                            final generated = await KeyGeneratorService.generateKey(
+                              keyType: selectedType,
+                              comment: commentCtrl.text.trim(),
+                            );
 
                             final keyModel = SshKeyModel(
                               id: const Uuid().v4(),
                               name: nameCtrl.text.trim(),
-                              keyType: selectedType,
-                              publicKey: pubKeyMock,
-                              fingerprint: fingerprint,
+                              keyType: generated.keyType,
+                              publicKey: generated.publicKeyOpenSSH,
+                              fingerprint: generated.fingerprint,
                               createdAt: DateTime.now(),
                             );
 
                             await ref.read(keysProvider.notifier).saveKey(
                                   keyModel: keyModel,
-                                  privateKeyPem: privKeyMock,
+                                  privateKeyPem: generated.privateKeyPem,
                                   passphrase: passphraseCtrl.text.isNotEmpty ? passphraseCtrl.text : null,
                                 );
 
