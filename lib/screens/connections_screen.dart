@@ -13,6 +13,8 @@ class ConnectionsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = ref.watch(connectionProfilesProvider);
+    final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
+    final bgImage = isPortrait ? 'assets/background_vertical.png' : 'assets/background_horizontal.png';
 
     return Scaffold(
       backgroundColor: AppColors.canvasBase,
@@ -30,11 +32,11 @@ class ConnectionsScreen extends ConsumerWidget {
         ],
       ),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/background.png'),
+            image: AssetImage(bgImage),
             fit: BoxFit.cover,
-            opacity: 0.15, // Low opacity so the list remains readable
+            opacity: 0.7, // Increased opacity so the dark image is visible
           ),
         ),
         child: _buildBody(context, ref, provider),
@@ -254,7 +256,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _authMethod,
+            initialValue: _authMethod,
             decoration: const InputDecoration(labelText: 'Authentication Method'),
             items: const [
               DropdownMenuItem(value: 'password', child: Text('Password')),

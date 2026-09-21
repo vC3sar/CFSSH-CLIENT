@@ -23,6 +23,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   late final SshEngine _sshEngine;
   bool _isConnected = false;
   String _statusMessage = 'Connecting...';
+  double _fontSize = 14.0;
   
   @override
   void initState() {
@@ -126,6 +127,24 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.zoom_out, color: AppColors.textDisabled),
+            onPressed: () {
+              setState(() {
+                _fontSize = (_fontSize - 1.0).clamp(8.0, 48.0);
+              });
+            },
+            tooltip: 'Zoom Out',
+          ),
+          IconButton(
+            icon: const Icon(Icons.zoom_in, color: AppColors.textDisabled),
+            onPressed: () {
+              setState(() {
+                _fontSize = (_fontSize + 1.0).clamp(8.0, 48.0);
+              });
+            },
+            tooltip: 'Zoom In',
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {},
           ),
@@ -140,9 +159,9 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
                 controller: terminalController,
                 autofocus: true,
                 backgroundOpacity: 0.0,
-                textStyle: const TerminalStyle(
+                textStyle: TerminalStyle(
                   fontFamily: 'JetBrains Mono',
-                  fontSize: 14,
+                  fontSize: _fontSize,
                 ),
                 theme: _buildTerminalTheme(),
               ),
