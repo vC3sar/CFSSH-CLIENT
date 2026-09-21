@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:state_notifier/state_notifier.dart';
 import 'package:dartssh2/dartssh2.dart';
 import '../models/connection_profile.dart';
+import '../providers/ssh_provider.dart';
 import '../services/ssh_engine.dart';
 import '../services/sftp_engine.dart';
 

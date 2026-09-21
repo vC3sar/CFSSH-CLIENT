@@ -71,7 +71,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
       title: Text(
         label,
-        style: AppTextStyles.titleSmall.copyWith(
+        style: AppTextStyles.titleMedium.copyWith(
           color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
         ),
       ),
@@ -171,7 +171,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
           
           const SizedBox(height: 32),
-          Text('RECENT CONNECTIONS', style: AppTextStyles.labelLarge),
+          Text('RECENT CONNECTIONS', style: AppTextStyles.labelMedium),
           const SizedBox(height: 16),
           
           // Recent Connections Feed

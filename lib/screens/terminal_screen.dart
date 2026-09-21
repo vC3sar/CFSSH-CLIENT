@@ -6,6 +6,7 @@ import '../models/connection_profile.dart';
 import '../providers/ssh_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/history_provider.dart';
+import '../providers/connection_provider.dart';
 import '../services/ssh_engine.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
