@@ -38,12 +38,13 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     _sshEngine = ref.read(sshEngineProvider);
     _fontSize = ref.read(settingsProvider).defaultFontSize;
     
-    // Use cached terminal if session exists
-    final existingSession = _sshEngine.getSession(widget.profile.id);
-    if (existingSession != null) {
-      terminal = existingSession.terminal;
-      _isConnected = existingSession.isConnected;
-      _statusMessage = _isConnected ? 'Connected' : (existingSession.error != null ? 'Error' : 'Connecting...');
+    // Ensure the session state exists and grab its persistent terminal
+    final session = _sshEngine.getOrCreateSession(widget.profile);
+    terminal = session.terminal;
+    
+    if (session.isConnected || session.isConnecting) {
+      _isConnected = session.isConnected;
+      _statusMessage = _isConnected ? 'Connected' : (session.error != null ? 'Error' : 'Connecting...');
       
       // Reattach input listener for this new view instance
       _attachInputListener();
@@ -51,7 +52,6 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       // We still want to make sure the shell is resized and active
       _connectSSH(isReconnecting: true);
     } else {
-      terminal = Terminal(maxLines: 10000);
       _connectSSH(isReconnecting: false);
     }
   }
@@ -146,7 +146,9 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       
       // Handle resize (xterm window size changes)
       terminal.onResize = (w, h, pw, ph) {
-        shell.resizeTerminal(w, h, pw, ph);
+        if (w > 0 && h > 0) {
+          shell.resizeTerminal(w, h, pw, ph);
+        }
       };
 
     } catch (e, stackTrace) {

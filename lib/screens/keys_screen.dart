@@ -42,7 +42,13 @@ class _KeysScreenState extends ConsumerState<KeysScreen> {
             ? const Center(child: CircularProgressIndicator(color: AppColors.electricCyan))
             : keysState.keys.isEmpty
                 ? _buildEmptyState()
-                : ListView.builder(
+                : GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 500,
+                      mainAxisExtent: 180,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                    ),
                     physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                     padding: const EdgeInsets.all(16.0),
                     itemCount: keysState.keys.length,
@@ -100,7 +106,7 @@ class _KeysScreenState extends ConsumerState<KeysScreen> {
     if (key.keyType.contains('ECDSA')) badgeColor = Colors.purpleAccent;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16.0),
+      margin: EdgeInsets.zero,
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: AppColors.surface1,
@@ -239,17 +245,25 @@ class _KeysScreenState extends ConsumerState<KeysScreen> {
   void _showAddKeyOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
+      constraints: const BoxConstraints(maxWidth: 600),
       backgroundColor: AppColors.surface1,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
         return Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          padding: EdgeInsets.only(
+            left: 24.0, 
+            right: 24.0,
+            top: 24.0,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24.0,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Text('Add SSH Key', style: AppTextStyles.headlineMedium),
               const SizedBox(height: 8),
               Text(
@@ -285,8 +299,9 @@ class _KeysScreenState extends ConsumerState<KeysScreen> {
               const SizedBox(height: 16),
             ],
           ),
-        );
-      },
+        ), // Close SingleChildScrollView
+      ); // Close Padding
+    },
     );
   }
 

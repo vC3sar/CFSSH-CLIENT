@@ -82,28 +82,33 @@ class SftpSelectorScreen extends ConsumerWidget {
         }
 
         return Card(
+          color: AppColors.surface1, // Changed to allow material color
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            leading: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const CircleAvatar(
-                  backgroundColor: AppColors.surface1,
-                  child: Icon(Icons.folder_shared, color: AppColors.subtleAmber),
-                ),
-                Positioned(
-                  right: -2,
-                  bottom: -2,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(
-                      color: AppColors.surface2,
-                      shape: BoxShape.circle,
-                    ),
-                    child: statusIcon,
+            leading: SizedBox(
+              width: 40,
+              height: 40,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const CircleAvatar(
+                    backgroundColor: AppColors.surface2,
+                    child: Icon(Icons.folder_shared, color: AppColors.subtleAmber),
                   ),
-                ),
-              ],
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: AppColors.surface2,
+                        shape: BoxShape.circle,
+                      ),
+                      child: statusIcon,
+                    ),
+                  ),
+                ],
+              ),
             ),
             title: Text(profile.name, style: AppTextStyles.titleMedium),
             subtitle: Text(
@@ -112,7 +117,7 @@ class SftpSelectorScreen extends ConsumerWidget {
             ),
             trailing: ElevatedButton.icon(
               icon: const Icon(Icons.folder, size: 16),
-              label: const Text('Browse Files'),
+              label: const Text('Browse'), // Shortened from "Browse Files" to prevent overflow
               onPressed: () {
                 Navigator.push(
                   context,

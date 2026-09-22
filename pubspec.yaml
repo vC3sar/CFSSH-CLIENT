@@ -50,6 +50,8 @@ dependencies:
   crypto: ^3.0.3
   cryptography: ^2.9.0
   pointycastle: ^4.0.0
+  desktop_drop: ^0.8.4
+  cross_file: ^0.3.5+5
 
 dev_dependencies:
   flutter_test:
@@ -62,6 +64,13 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_native_splash: ^2.4.8
+  flutter_launcher_icons: ^0.14.1
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/logo.png"
+  min_sdk_android: 21
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -80,6 +89,7 @@ flutter:
     - assets/background_horizontal.png
     - assets/splash_vertical.png
     - assets/splash_horizontal.png
+    - assets/logo.png
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

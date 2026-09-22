@@ -113,28 +113,33 @@ class ConnectionsScreen extends ConsumerWidget {
         }
 
         return Card(
+          color: AppColors.surface1, // Provide material color
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            leading: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const CircleAvatar(
-                  backgroundColor: AppColors.surface1,
-                  child: Icon(Icons.computer, color: AppColors.electricCyan),
-                ),
-                Positioned(
-                  right: -2,
-                  bottom: -2,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(
-                      color: AppColors.surface2,
-                      shape: BoxShape.circle,
-                    ),
-                    child: statusIcon,
+            leading: SizedBox(
+              width: 40,
+              height: 40,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const CircleAvatar(
+                    backgroundColor: AppColors.surface2,
+                    child: Icon(Icons.computer, color: AppColors.electricCyan),
                   ),
-                ),
-              ],
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: AppColors.surface2,
+                        shape: BoxShape.circle,
+                      ),
+                      child: statusIcon,
+                    ),
+                  ),
+                ],
+              ),
             ),
             title: Text(
               profile.name,
@@ -191,6 +196,8 @@ class ConnectionsScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      constraints: const BoxConstraints(maxWidth: 600),
       builder: (context) {
         return _ProfileEditor(profile: profile, parentRef: ref);
       },

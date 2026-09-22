@@ -36,8 +36,9 @@ class _TrustedHostsScreenState extends ConsumerState<TrustedHostsScreen> {
       appBar: AppBar(
         title: const Text('SSH Host Keys'),
       ),
-      body: Column(
-        children: [
+      body: SafeArea(
+        child: Column(
+          children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
@@ -79,18 +80,24 @@ class _TrustedHostsScreenState extends ConsumerState<TrustedHostsScreen> {
                   return const Center(child: Text('No matching hosts found.', style: TextStyle(color: AppColors.textSecondary)));
                 }
 
-                return ListView.builder(
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: hosts.length,
-                  itemBuilder: (context, index) {
-                    final host = hosts[index];
-                    return _buildHostCard(host);
-                  },
+                return Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 800),
+                    child: ListView.builder(
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: hosts.length,
+                      itemBuilder: (context, index) {
+                        final host = hosts[index];
+                        return _buildHostCard(host);
+                      },
+                    ),
+                  ),
                 );
               },
             ),
           ),
         ],
+        ),
       ),
     );
   }

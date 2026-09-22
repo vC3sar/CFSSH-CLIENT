@@ -19,13 +19,19 @@ typedef HostKeyVerificationCallback = Future<bool> Function(
   String? oldFingerprint
 );
 
+enum SshSessionStatus { disconnected, connecting, connected, reconnecting, disconnecting, error }
+
 class SshSessionState {
   final ConnectionProfile profile;
   SSHClient? client;
   SSHSession? shell;
   final Terminal terminal = Terminal(maxLines: 10000);
-  bool isConnected = false;
-  bool isConnecting = false;
+  
+  SshSessionStatus status = SshSessionStatus.disconnected;
+  
+  bool get isConnected => status == SshSessionStatus.connected;
+  bool get isConnecting => status == SshSessionStatus.connecting || status == SshSessionStatus.reconnecting;
+  
   String? error;
   
   bool manualDisconnect = false;
@@ -47,34 +53,35 @@ class SshEngine extends ChangeNotifier {
 
   SshSessionState? getSession(String profileId) => _activeSessions[profileId];
 
+  SshSessionState getOrCreateSession(ConnectionProfile profile) {
+    var state = _activeSessions[profile.id];
+    if (state == null) {
+      state = SshSessionState(profile);
+      _activeSessions[profile.id] = state;
+      // We don't notifyListeners here because it's typically called during initState
+    }
+    return state;
+  }
+
   List<SshSessionState> get activeSessions => _activeSessions.values.toList();
 
   Future<void> connect(
     ConnectionProfile profile, {
     HostKeyVerificationCallback? onHostKeyVerification,
   }) async {
-    var state = _activeSessions[profile.id];
+    var state = getOrCreateSession(profile);
     
-    if (state != null) {
-      if (state.isConnected || state.isConnecting) {
-        debugPrint('SSH_ENGINE: Already connecting/connected to ${profile.id}');
-        return; 
-      }
-    } else {
-      state = SshSessionState(profile);
-      _activeSessions[profile.id] = state;
-      notifyListeners();
+    if (state.isConnecting || state.isConnected) {
+      debugPrint('SSH_ENGINE: Already connecting/connected to ${profile.id}');
+      return; 
     }
     
-    final currentState = state!;
-    
-    currentState.manualDisconnect = false;
-    
-    currentState.isConnecting = true;
-    currentState.error = null;
+    state.manualDisconnect = false;
+    state.status = SshSessionStatus.connecting;
+    state.error = null;
     notifyListeners();
     
-    // YIELD TO UI THREAD: Prevents "Skipped 375 frames!" freezing during navigation transition
+    // YIELD TO UI THREAD: Prevents freezing during navigation transition
     await Future.delayed(const Duration(milliseconds: 400));
     
     try {
@@ -94,7 +101,7 @@ class SshEngine extends ChangeNotifier {
         throw Exception('No SSH Key selected or private key could not be loaded. Please assign a valid key in Servers.');
       }
 
-      currentState.client = SSHClient(
+      state.client = SSHClient(
         socket,
         username: profile.username,
         keepAliveInterval: profile.keepalive > 0 ? Duration(seconds: profile.keepalive) : null,
@@ -110,22 +117,17 @@ class SshEngine extends ChangeNotifier {
           
           if (trustedHost != null) {
             if (trustedHost.fingerprint == sha256) {
-              // Known and matches!
-              // Update last used asynchronously
               hostKeyManager.saveTrustedHost(profile.host, profile.port, algorithm, sha256);
               return true;
             } else {
-              // Key CHANGED
               if (onHostKeyVerification != null) {
                 return await onHostKeyVerification(
                   profile.host, profile.port, algorithm, sha256, md5, true, trustedHost.fingerprint
                 );
               }
-              // If no callback is provided, we MUST reject by default for safety
               return false;
             }
           } else {
-            // UNKNOWN HOST
             if (onHostKeyVerification != null) {
               return await onHostKeyVerification(
                 profile.host, profile.port, algorithm, sha256, md5, false, null
@@ -136,20 +138,19 @@ class SshEngine extends ChangeNotifier {
         },
       );
 
-      await currentState.client!.authenticated;
-      currentState.isConnected = true;
-      currentState.isConnecting = false;
-      currentState.reconnectAttempts = 0; // reset on success
+      await state.client!.authenticated;
+      state.status = SshSessionStatus.connected;
+      state.reconnectAttempts = 0; // reset on success
       notifyListeners();
       debugPrint('SSH_ENGINE: Authenticated successfully.');
       
       // Auto-reconnect listener
-      currentState.client!.done.whenComplete(() {
-        if (!currentState.manualDisconnect && currentState.reconnectAttempts < 3) {
+      state.client!.done.whenComplete(() {
+        if (!state.manualDisconnect && state.reconnectAttempts < 3) {
           _handleAutoReconnect(profile, onHostKeyVerification);
-        } else if (!currentState.manualDisconnect && currentState.reconnectAttempts >= 3) {
-          currentState.error = 'Connection lost. Max reconnect attempts reached.';
-          currentState.isConnected = false;
+        } else if (!state.manualDisconnect && state.reconnectAttempts >= 3) {
+          state.error = 'Connection lost. Max reconnect attempts reached.';
+          state.status = SshSessionStatus.error;
           notifyListeners();
         }
       });
@@ -157,21 +158,19 @@ class SshEngine extends ChangeNotifier {
     } catch (e, stackTrace) {
       debugPrint('SSH_ENGINE ERROR: $e');
       debugPrint('SSH_ENGINE STACK: $stackTrace');
-      currentState.error = e.toString();
-      currentState.isConnected = false;
-      currentState.isConnecting = false;
+      state.error = e.toString();
+      state.status = SshSessionStatus.error;
       notifyListeners();
-      rethrow;
+      // Do not rethrow; we handled it by updating the UI state safely.
     }
   }
 
   void _handleAutoReconnect(ConnectionProfile profile, HostKeyVerificationCallback? onHostKeyVerification) {
     final state = _activeSessions[profile.id];
-    if (state == null) return;
+    if (state == null || state.manualDisconnect || state.status == SshSessionStatus.reconnecting) return;
 
     state.reconnectAttempts++;
-    state.isConnected = false;
-    state.isConnecting = true;
+    state.status = SshSessionStatus.reconnecting;
     state.error = 'Connection lost. Reconnecting (Attempt ${state.reconnectAttempts}/3)...';
     notifyListeners();
 
@@ -180,7 +179,7 @@ class SshEngine extends ChangeNotifier {
     Future.delayed(const Duration(seconds: 3), () async {
       try {
         await connect(profile, onHostKeyVerification: onHostKeyVerification);
-        // If reconnected successfully, restart shell if it was active
+        
         final newState = _activeSessions[profile.id];
         if (newState != null && newState.isConnected && newState.shell != null) {
            newState.shell = null; // force recreation
@@ -189,13 +188,19 @@ class SshEngine extends ChangeNotifier {
         }
       } catch (e) {
         debugPrint('SSH_ENGINE: Auto-reconnect failed: $e');
-        // The error is already caught in connect(), and state is updated.
-        // If done triggers again (it shouldn't if connect fails), it will just retry.
-        // Wait, if connect() fails, client!.done won't trigger because client wasn't created.
-        // We should manually trigger the next retry!
         final failedState = _activeSessions[profile.id];
         if (failedState != null && !failedState.manualDisconnect && failedState.reconnectAttempts < 3) {
-           _handleAutoReconnect(profile, onHostKeyVerification);
+           // Wait and try again
+           Future.delayed(const Duration(seconds: 2), () {
+             if (!failedState.manualDisconnect) {
+               failedState.status = SshSessionStatus.disconnected; // Reset so reconnect can trigger
+               _handleAutoReconnect(profile, onHostKeyVerification);
+             }
+           });
+        } else if (failedState != null) {
+           failedState.error = 'Connection lost. Auto-reconnect failed.';
+           failedState.status = SshSessionStatus.error;
+           notifyListeners();
         }
       }
     });
@@ -221,7 +226,6 @@ class SshEngine extends ChangeNotifier {
         }
       }
 
-      // 2. FALLBACK (like Bitvise): If no specific key or key file missing, try all keys saved in Key Manager
       final allKeys = await DatabaseService.instance.getAllSshKeys();
       debugPrint('SSH_ENGINE: Attempting fallback with all saved SSH keys in Key Manager (count: ${allKeys.length}).');
       final List<SSHKeyPair> fallbackIdentities = [];
@@ -230,6 +234,7 @@ class SshEngine extends ChangeNotifier {
         final pass = await _secureStorage.getPassphrase(keyModel.id);
         if (pk != null) {
           try {
+            await Future.delayed(Duration.zero); // YIELD TO UI THREAD: Prevents skipped frames during heavy crypto parsing
             final parsed = SSHKeyPair.fromPem(pk, pass);
             fallbackIdentities.addAll(parsed);
           } catch (e) {
@@ -281,13 +286,31 @@ class SshEngine extends ChangeNotifier {
     return state.shell!;
   }
   
+  Future<void> disposeSession(String profileId) async {
+    final state = _activeSessions[profileId];
+    if (state != null) {
+      state.manualDisconnect = true;
+      try {
+        state.client?.close();
+      } catch (_) {}
+      state.status = SshSessionStatus.disconnected;
+      _activeSessions.remove(profileId);
+      notifyListeners();
+    }
+  }
+
   Future<void> disconnect(String profileId) async {
     final state = _activeSessions[profileId];
     if (state != null) {
       state.manualDisconnect = true;
-      state.isConnected = false;
-      state.client?.close();
-      _activeSessions.remove(profileId);
+      state.status = SshSessionStatus.disconnecting;
+      notifyListeners();
+      
+      try {
+        state.client?.close();
+      } catch (_) {}
+      
+      state.status = SshSessionStatus.disconnected;
       notifyListeners();
     }
   }
@@ -295,8 +318,10 @@ class SshEngine extends ChangeNotifier {
   void disconnectAll() {
     for (var state in _activeSessions.values) {
       state.manualDisconnect = true;
-      state.isConnected = false;
-      state.client?.close();
+      state.status = SshSessionStatus.disconnected;
+      try {
+        state.client?.close();
+      } catch (_) {}
     }
     _activeSessions.clear();
     notifyListeners();

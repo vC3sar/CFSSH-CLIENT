@@ -46,9 +46,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       child: Column(
         children: [
           const SizedBox(height: 32),
-          const Icon(Icons.rocket_launch, size: 48, color: AppColors.electricCyan),
           const SizedBox(height: 16),
-          Text('CFSSH', style: AppTextStyles.headlineMedium),
+          Image.asset('assets/logo.png', width: 80, fit: BoxFit.contain),
           const SizedBox(height: 32),
           _buildSidebarItem(Icons.dashboard_outlined, Icons.dashboard, 'Dashboard', 0),
           _buildSidebarItem(Icons.dns_outlined, Icons.dns, 'Servers', 1),
@@ -63,34 +62,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildSidebarItem(IconData iconUnselected, IconData iconSelected, String label, int index) {
     final isSelected = _selectedIndex == index;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeInOut,
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
+      child: Material(
         color: isSelected ? AppColors.surface2 : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
-      ),
-      child: ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        leading: Icon(
-          isSelected ? iconSelected : iconUnselected,
-          color: isSelected ? AppColors.electricCyan : AppColors.textSecondary,
-        ),
-        title: Text(
-          label,
-          style: AppTextStyles.titleMedium.copyWith(
-            color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+        child: ListTile(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          leading: Icon(
+            isSelected ? iconSelected : iconUnselected,
+            color: isSelected ? AppColors.electricCyan : AppColors.textSecondary,
           ),
+          title: Text(
+            label,
+            style: AppTextStyles.titleMedium.copyWith(
+              color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+            ),
+          ),
+          selected: isSelected,
+          onTap: () {
+            if (_selectedIndex != index) {
+              setState(() {
+                _selectedIndex = index;
+              });
+            }
+          },
         ),
-        selected: isSelected,
-        onTap: () {
-          if (_selectedIndex != index) {
-            setState(() {
-              _selectedIndex = index;
-            });
-          }
-        },
       ),
     );
   }
@@ -225,9 +222,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'CFSSH CLIENT',
-                            style: Theme.of(context).textTheme.headlineLarge,
+                          Image.asset(
+                            'assets/logo.png',
+                            height: 48,
+                            fit: BoxFit.contain,
                           ),
                           if (activeSessions > 0)
                             IconButton(
@@ -330,30 +328,33 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
+                      child: Material(
                         color: AppColors.surface1.withValues(alpha: 0.85),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.surfaceBorder.withValues(alpha: 0.5)),
-                      ),
-                      child: ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: AppColors.surface2,
-                          child: Icon(Icons.computer, color: AppColors.electricCyan),
+                        child: ListTile(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: AppColors.surfaceBorder.withValues(alpha: 0.5)),
+                          ),
+                          leading: const CircleAvatar(
+                            backgroundColor: AppColors.surface2,
+                            child: Icon(Icons.computer, color: AppColors.electricCyan),
+                          ),
+                          title: Text(profile.name, style: AppTextStyles.titleMedium),
+                          subtitle: Text(
+                            timeago.format(history.timestamp),
+                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                          ),
+                          trailing: const Icon(Icons.chevron_right, color: AppColors.textDisabled),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => TerminalScreen(profile: profile),
+                              ),
+                            );
+                          },
                         ),
-                        title: Text(profile.name, style: AppTextStyles.titleMedium),
-                        subtitle: Text(
-                          timeago.format(history.timestamp),
-                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
-                        ),
-                        trailing: const Icon(Icons.chevron_right, color: AppColors.textDisabled),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => TerminalScreen(profile: profile),
-                            ),
-                          );
-                        },
                       ),
                     );
                   },

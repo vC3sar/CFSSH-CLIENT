@@ -17,8 +17,11 @@ class SettingsScreen extends ConsumerWidget {
 
     return Container(
       color: Colors.transparent, // Background handled by parent container
-      child: ListView(
-        padding: const EdgeInsets.all(24.0),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: ListView(
+            padding: const EdgeInsets.all(24.0),
         children: [
           Text(
             'Settings',
@@ -130,6 +133,8 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
         ],
+          ),
+        ),
       ),
     );
   }
