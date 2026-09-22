@@ -51,16 +51,15 @@ class SftpNotifier extends StateNotifier<SftpState> {
   SftpNotifier(this.profile, this.ref) : super(SftpState(isLoading: true)) {
     _sftpEngine = ref.read(sftpEngineProvider);
     _sshEngine = ref.read(sshEngineProvider);
-    Future.microtask(() => connectAndLoad());
   }
 
-  Future<void> connectAndLoad() async {
+  Future<void> connectAndLoad({HostKeyVerificationCallback? onHostKeyVerification}) async {
     try {
       state = state.copyWith(isLoading: true, error: '');
       
       var session = _sshEngine.getSession(profile.id);
       if (session == null || !session.isConnected) {
-        await _sshEngine.connect(profile);
+        await _sshEngine.connect(profile, onHostKeyVerification: onHostKeyVerification);
       }
       
       _sftpClient = await _sftpEngine.getSftpClient(profile.id);

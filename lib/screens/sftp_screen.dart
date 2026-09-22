@@ -8,15 +8,44 @@ import '../providers/sftp_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
-class SftpScreen extends ConsumerWidget {
+import '../widgets/host_key_dialogs.dart';
+
+class SftpScreen extends ConsumerStatefulWidget {
   final ConnectionProfile profile;
 
   const SftpScreen({super.key, required this.profile});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sftpState = ref.watch(sftpProvider(profile));
-    final notifier = ref.read(sftpProvider(profile).notifier);
+  ConsumerState<SftpScreen> createState() => _SftpScreenState();
+}
+
+class _SftpScreenState extends ConsumerState<SftpScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(sftpProvider(widget.profile).notifier).connectAndLoad(
+        onHostKeyVerification: (host, port, algorithm, sha256Fingerprint, md5Fingerprint, isChanged, oldFingerprint) async {
+          return await HostKeyDialogs.showVerificationDialog(
+            context,
+            ref,
+            host,
+            port,
+            algorithm,
+            sha256Fingerprint,
+            md5Fingerprint,
+            isChanged,
+            oldFingerprint,
+          );
+        },
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sftpState = ref.watch(sftpProvider(widget.profile));
+    final notifier = ref.read(sftpProvider(widget.profile).notifier);
 
     return Scaffold(
       backgroundColor: AppColors.canvasBase,
@@ -25,7 +54,7 @@ class SftpScreen extends ConsumerWidget {
           children: [
             const Icon(Icons.folder_shared, color: AppColors.electricCyan),
             const SizedBox(width: 8),
-            Text(profile.name),
+            Text(widget.profile.name),
           ],
         ),
         actions: [

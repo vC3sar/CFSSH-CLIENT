@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xterm/xterm.dart';
+import 'package:dartssh2/dartssh2.dart';
 import '../models/connection_profile.dart';
 import '../providers/ssh_provider.dart';
 import '../providers/settings_provider.dart';
@@ -10,6 +11,7 @@ import '../providers/connection_provider.dart';
 import '../services/ssh_engine.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../widgets/host_key_dialogs.dart';
 
 class TerminalScreen extends ConsumerStatefulWidget {
   final ConnectionProfile profile;
@@ -35,21 +37,86 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     super.initState();
     _sshEngine = ref.read(sshEngineProvider);
     _fontSize = ref.read(settingsProvider).defaultFontSize;
-    terminal = Terminal(maxLines: 10000);
-    _connectSSH();
+    
+    // Use cached terminal if session exists
+    final existingSession = _sshEngine.getSession(widget.profile.id);
+    if (existingSession != null) {
+      terminal = existingSession.terminal;
+      _isConnected = existingSession.isConnected;
+      _statusMessage = _isConnected ? 'Connected' : (existingSession.error != null ? 'Error' : 'Connecting...');
+      
+      // Reattach input listener for this new view instance
+      _attachInputListener();
+      
+      // We still want to make sure the shell is resized and active
+      _connectSSH(isReconnecting: true);
+    } else {
+      terminal = Terminal(maxLines: 10000);
+      _connectSSH(isReconnecting: false);
+    }
   }
 
-  Future<void> _connectSSH() async {
-    try {
-      terminal.write('Connecting to ${widget.profile.host}:${widget.profile.port}...\r\n');
+  void _attachInputListener() {
+    terminal.onOutput = (String data) {
+      if (data.isEmpty) return;
       
-      if (mounted) {
-        setState(() {
-          _statusMessage = 'Authenticating...';
-        });
+      String output = data;
+      
+      if (data.length == 1) {
+        if (_ctrlActive) {
+          int charCode = data.toUpperCase().codeUnitAt(0);
+          if (charCode >= 64 && charCode <= 126) {
+            int ctrlCode = charCode & 0x1F;
+            output = String.fromCharCode(ctrlCode);
+          } else if (data == ' ') {
+            output = '\x00'; // CTRL+Space
+          }
+        }
+        if (_altActive) {
+          output = '\x1b$output';
+        }
+        
+        if (_ctrlActive || _altActive) {
+          setState(() {
+            _ctrlActive = false;
+            _altActive = false;
+          });
+        }
+      }
+      
+      final currentShell = _sshEngine.getSession(widget.profile.id)?.shell;
+      currentShell?.write(utf8.encode(output));
+    };
+  }
+
+  Future<void> _connectSSH({required bool isReconnecting}) async {
+    try {
+      if (!isReconnecting) {
+        terminal.write('Connecting to ${widget.profile.host}:${widget.profile.port}...\r\n');
+        terminal.write('Authenticating (this may freeze the screen for a few seconds)...\r\n');
+        if (mounted) {
+          setState(() {
+            _statusMessage = 'Authenticating...';
+          });
+        }
       }
 
-      await _sshEngine.connect(widget.profile);
+      await _sshEngine.connect(
+        widget.profile,
+        onHostKeyVerification: (host, port, algorithm, sha256Fingerprint, md5Fingerprint, isChanged, oldFingerprint) async {
+          return await HostKeyDialogs.showVerificationDialog(
+            context,
+            ref,
+            host,
+            port,
+            algorithm,
+            sha256Fingerprint,
+            md5Fingerprint,
+            isChanged,
+            oldFingerprint,
+          );
+        },
+      );
       
       if (!mounted) return;
 
@@ -74,48 +141,8 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       final updatedProfile = widget.profile.copyWith(lastConnected: DateTime.now());
       ref.read(connectionProfilesProvider.notifier).updateProfile(updatedProfile);
 
-      // Listen for data from the remote server
-      // IMPORTANT: utf8.decoder MUST be bound to the stream to maintain state
-      // across TCP chunks, otherwise ANSI escape sequences and multibyte chars get corrupted.
-      shell.stdout.cast<List<int>>().transform(const Utf8Decoder(allowMalformed: true)).listen((String text) {
-        if (mounted) terminal.write(text);
-      });
-
-      shell.stderr.cast<List<int>>().transform(const Utf8Decoder(allowMalformed: true)).listen((String text) {
-        if (mounted) terminal.write(text);
-      });
-
-      // Send local input to the remote server with sticky modifier support
-      terminal.onOutput = (String data) {
-        if (data.isEmpty) return;
-        
-        String output = data;
-        
-        // Only apply modifier logic if it's a single keystroke (not a paste operation)
-        if (data.length == 1) {
-          if (_ctrlActive) {
-            int charCode = data.toUpperCase().codeUnitAt(0);
-            if (charCode >= 64 && charCode <= 126) {
-              int ctrlCode = charCode & 0x1F;
-              output = String.fromCharCode(ctrlCode);
-            } else if (data == ' ') {
-              output = '\x00'; // CTRL+Space
-            }
-          }
-          if (_altActive) {
-            output = '\x1b$output';
-          }
-          
-          if (_ctrlActive || _altActive) {
-            setState(() {
-              _ctrlActive = false;
-              _altActive = false;
-            });
-          }
-        }
-        
-        shell.write(utf8.encode(output));
-      };
+      // Setup input listening
+      _attachInputListener();
       
       // Handle resize (xterm window size changes)
       terminal.onResize = (w, h, pw, ph) {
@@ -157,9 +184,38 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
 
   @override
   void dispose() {
-    // Correct Riverpod usage: don't use ref.read inside dispose.
-    _sshEngine.disconnect(widget.profile.id);
+    // We NO LONGER disconnect here. The session stays active in background.
+    // _sshEngine.disconnect(widget.profile.id);
+    
+    // Clear the onOutput callback so it doesn't hold references to this disposed screen
+    terminal.onOutput = null;
     super.dispose();
+  }
+
+  void _confirmDisconnect() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface1,
+        title: const Text('Disconnect Session'),
+        content: Text('Are you sure you want to disconnect from ${widget.profile.name}? Any running foreground processes will be killed.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.softCrimson),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      _sshEngine.disconnect(widget.profile.id);
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    }
   }
 
   @override
@@ -201,8 +257,9 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
             tooltip: 'Zoom In',
           ),
           IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {},
+            icon: const Icon(Icons.power_settings_new, color: AppColors.softCrimson),
+            tooltip: 'Disconnect Session',
+            onPressed: _confirmDisconnect,
           ),
         ],
       ),

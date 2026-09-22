@@ -3,6 +3,7 @@ import 'package:path/path.dart';
 import '../models/connection_profile.dart';
 import '../models/connection_history.dart';
 import '../models/ssh_key_model.dart';
+import '../models/trusted_host.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._init();
@@ -22,7 +23,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -51,6 +52,20 @@ class DatabaseService {
         publicKey $textType,
         fingerprint $textType,
         createdAt $textType
+      )
+      ''');
+    }
+
+    if (oldVersion < 4) {
+      await db.execute('''
+      CREATE TABLE trusted_hosts (
+        id $idType,
+        host $textType,
+        port INTEGER NOT NULL,
+        algorithm $textType,
+        fingerprint $textType,
+        createdAt $textType,
+        lastUsedAt $textType
       )
       ''');
     }
@@ -94,6 +109,18 @@ CREATE TABLE ssh_keys (
   publicKey $textType,
   fingerprint $textType,
   createdAt $textType
+)
+''');
+
+    await db.execute('''
+CREATE TABLE trusted_hosts (
+  id $idType,
+  host $textType,
+  port $intType,
+  algorithm $textType,
+  fingerprint $textType,
+  createdAt $textType,
+  lastUsedAt $textType
 )
 ''');
   }
@@ -197,6 +224,44 @@ CREATE TABLE ssh_keys (
     final db = await instance.database;
     await db.delete(
       'ssh_keys',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // Trusted Host Methods
+  Future<void> insertTrustedHost(TrustedHost trustedHost) async {
+    final db = await instance.database;
+    await db.insert(
+      'trusted_hosts',
+      trustedHost.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<TrustedHost?> getTrustedHost(String host, int port) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'trusted_hosts',
+      where: 'host = ? AND port = ?',
+      whereArgs: [host, port],
+    );
+    if (result.isNotEmpty) {
+      return TrustedHost.fromMap(result.first);
+    }
+    return null;
+  }
+
+  Future<List<TrustedHost>> getAllTrustedHosts() async {
+    final db = await instance.database;
+    final result = await db.query('trusted_hosts', orderBy: 'lastUsedAt DESC');
+    return result.map((json) => TrustedHost.fromMap(json)).toList();
+  }
+
+  Future<void> deleteTrustedHost(String id) async {
+    final db = await instance.database;
+    await db.delete(
+      'trusted_hosts',
       where: 'id = ?',
       whereArgs: [id],
     );

@@ -198,7 +198,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     // Watch providers
     final profilesState = ref.watch(connectionProfilesProvider);
     final historyState = ref.watch(historyProvider);
-    final activeSessions = ref.watch(sshEngineProvider).activeSessions.where((s) => s.isConnected).length;
+    final sshEngine = ref.watch(sshEngineProvider);
 
     return Container(
       decoration: BoxDecoration(
@@ -218,9 +218,52 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'CFSSH CLIENT',
-                    style: Theme.of(context).textTheme.headlineLarge,
+                  ListenableBuilder(
+                    listenable: sshEngine,
+                    builder: (context, _) {
+                      final activeSessions = sshEngine.activeSessions.where((s) => s.isConnected).length;
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'CFSSH CLIENT',
+                            style: Theme.of(context).textTheme.headlineLarge,
+                          ),
+                          if (activeSessions > 0)
+                            IconButton(
+                              icon: const Icon(Icons.power_settings_new, color: AppColors.softCrimson),
+                              tooltip: 'Close All Sessions',
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    backgroundColor: AppColors.surface1,
+                                    title: const Text('Close All Sessions'),
+                                    content: Text('Are you sure you want to close all $activeSessions active background session(s)?'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.softCrimson),
+                                        onPressed: () => Navigator.pop(context, true),
+                                        child: const Text('Close All'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (confirm == true) {
+                                  sshEngine.disconnectAll();
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('All sessions closed.'), backgroundColor: AppColors.surfaceBorder),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                        ],
+                      );
+                    }
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -232,17 +275,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   const SizedBox(height: 32),
                   
                   // Dashboard Grid
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: MediaQuery.of(context).size.width >= 1024 ? 4 : 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 2.0,
-                    children: [
-                      _buildGlassStatCard('ACTIVE', '$activeSessions', AppColors.phosphorGreen),
-                      _buildGlassStatCard('SERVERS', '${profilesState.profiles.length}', AppColors.textPrimary),
-                    ],
+                  ListenableBuilder(
+                    listenable: sshEngine,
+                    builder: (context, _) {
+                      final activeSessions = sshEngine.activeSessions.where((s) => s.isConnected).length;
+                      return GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: MediaQuery.of(context).size.width >= 1024 ? 4 : 2,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 2.0,
+                        children: [
+                          _buildGlassStatCard('ACTIVE', '$activeSessions', AppColors.phosphorGreen),
+                          _buildGlassStatCard('SERVERS', '${profilesState.profiles.length}', AppColors.textPrimary),
+                        ],
+                      );
+                    }
                   ),
                   
                   const SizedBox(height: 32),

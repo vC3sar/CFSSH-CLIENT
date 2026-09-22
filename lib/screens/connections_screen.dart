@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/connection_provider.dart';
 import '../providers/keys_provider.dart';
+import '../providers/ssh_provider.dart';
+import '../services/ssh_engine.dart';
 import '../models/connection_profile.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -15,6 +17,7 @@ class ConnectionsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = ref.watch(connectionProfilesProvider);
+    final sshEngine = ref.watch(sshEngineProvider);
     final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
     final bgImage = isPortrait ? 'assets/background_vertical.png' : 'assets/background_horizontal.png';
 
@@ -50,12 +53,12 @@ class ConnectionsScreen extends ConsumerWidget {
             opacity: 0.7,
           ),
         ),
-        child: _buildBody(context, ref, provider),
+        child: _buildBody(context, ref, provider, sshEngine),
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context, WidgetRef ref, ConnectionProfileState state) {
+  Widget _buildBody(BuildContext context, WidgetRef ref, ConnectionProfileState state, SshEngine sshEngine) {
     if (state.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -168,7 +171,13 @@ class ConnectionsScreen extends ConsumerWidget {
                       ),
                     );
                   },
-                  child: const Text('Connect'),
+                  child: sshEngine.getSession(profile.id)?.isConnecting == true
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.canvasBase),
+                        )
+                      : Text(sshEngine.getSession(profile.id)?.isConnected == true ? 'Resume' : 'Connect'),
                 ),
               ],
             ),
