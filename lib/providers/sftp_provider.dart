@@ -20,7 +20,7 @@ class SftpState {
   final String? error;
 
   SftpState({
-    this.currentPath = '.',
+    this.currentPath = '/',
     this.items = const [],
     this.isLoading = false,
     this.error,
@@ -135,6 +135,33 @@ class SftpNotifier extends StateNotifier<SftpState> {
     }
   }
 
+  Future<bool> uploadFileToExactPath(String localFilePath, String exactRemotePath) async {
+    if (_sftpClient == null) return false;
+    try {
+      state = state.copyWith(isLoading: true, error: '');
+      final file = File(localFilePath);
+      final remoteFile = await _sftpClient!.open(exactRemotePath, mode: SftpFileOpenMode.create | SftpFileOpenMode.write);
+      final stream = file.openRead();
+      await remoteFile.write(stream.cast<Uint8List>());
+      await remoteFile.close();
+      await loadDirectory(state.currentPath);
+      return true;
+    } catch (e) {
+      state = state.copyWith(error: 'Upload to path failed: $e', isLoading: false);
+      return false;
+    }
+  }
+
+  Future<bool> fileExists(String path) async {
+    if (_sftpClient == null) return false;
+    try {
+      await _sftpClient!.stat(path);
+      return true;
+    } catch (e) {
+      return false; // stat throws if file doesn't exist
+    }
+  }
+
   Future<void> downloadFile(String remoteFileName, String localFilePath) async {
     if (_sftpClient == null) return;
     try {
@@ -157,6 +184,47 @@ class SftpNotifier extends StateNotifier<SftpState> {
       state = state.copyWith(isLoading: false);
     } catch (e) {
       state = state.copyWith(error: 'Download failed: $e', isLoading: false);
+    }
+  }
+
+  Future<void> createDirectory(String folderName) async {
+    if (_sftpClient == null) return;
+    try {
+      state = state.copyWith(isLoading: true, error: '');
+      final newPath = '${state.currentPath}/$folderName'.replaceAll('//', '/');
+      await _sftpClient!.mkdir(newPath);
+      await loadDirectory(state.currentPath);
+    } catch (e) {
+      state = state.copyWith(error: 'Failed to create directory: $e', isLoading: false);
+    }
+  }
+
+  Future<void> createFile(String fileName) async {
+    if (_sftpClient == null) return;
+    try {
+      state = state.copyWith(isLoading: true, error: '');
+      final newPath = '${state.currentPath}/$fileName'.replaceAll('//', '/');
+      final remoteFile = await _sftpClient!.open(newPath, mode: SftpFileOpenMode.create | SftpFileOpenMode.write);
+      await remoteFile.close();
+      await loadDirectory(state.currentPath);
+    } catch (e) {
+      state = state.copyWith(error: 'Failed to create file: $e', isLoading: false);
+    }
+  }
+
+  Future<void> deleteItem(String fileName, bool isDir) async {
+    if (_sftpClient == null) return;
+    try {
+      state = state.copyWith(isLoading: true, error: '');
+      final remotePath = '${state.currentPath}/$fileName'.replaceAll('//', '/');
+      if (isDir) {
+        await _sftpClient!.rmdir(remotePath);
+      } else {
+        await _sftpClient!.remove(remotePath);
+      }
+      await loadDirectory(state.currentPath);
+    } catch (e) {
+      state = state.copyWith(error: 'Failed to delete: $e', isLoading: false);
     }
   }
 }

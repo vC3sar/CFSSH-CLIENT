@@ -106,6 +106,16 @@ class LocalFileNotifier extends StateNotifier<LocalFileState> {
     }
   }
 
+  Future<void> createFile(String fileName) async {
+    try {
+      final newFile = File(p.join(state.currentPath, fileName));
+      await newFile.create();
+      await loadDirectory(state.currentPath);
+    } catch (e) {
+      state = state.copyWith(error: 'Failed to create file: $e');
+    }
+  }
+
   Future<void> deleteEntity(FileSystemEntity entity) async {
     try {
       if (entity is Directory) {

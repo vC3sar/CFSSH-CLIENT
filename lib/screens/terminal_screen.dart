@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xterm/xterm.dart';
@@ -12,6 +14,7 @@ import '../services/ssh_engine.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/host_key_dialogs.dart';
+import 'sftp_screen.dart';
 
 class TerminalScreen extends ConsumerStatefulWidget {
   final ConnectionProfile profile;
@@ -31,10 +34,13 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   double _fontSize = 14.0;
   bool _ctrlActive = false;
   bool _altActive = false;
+  late bool _showMacroBar;
+  bool _showSftp = false;
   
   @override
   void initState() {
     super.initState();
+    _showMacroBar = kIsWeb || (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS);
     _sshEngine = ref.read(sshEngineProvider);
     _fontSize = ref.read(settingsProvider).defaultFontSize;
     
@@ -125,6 +131,14 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         _statusMessage = 'Connected';
       });
 
+      // Assign onResize early so any layout changes are captured
+      terminal.onResize = (w, h, pw, ph) {
+        if (w > 0 && h > 0) {
+          final s = _sshEngine.getSession(widget.profile.id)?.shell;
+          s?.resizeTerminal(w, h, pw, ph);
+        }
+      };
+
       int initialCols = terminal.viewWidth > 0 ? terminal.viewWidth : 80;
       int initialRows = terminal.viewHeight > 0 ? terminal.viewHeight : 24;
       
@@ -133,6 +147,11 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         initialCols,
         initialRows,
       );
+
+      // In case the terminal layout completed while we were authenticating
+      if (terminal.viewWidth > 0 && terminal.viewHeight > 0) {
+        shell.resizeTerminal(terminal.viewWidth, terminal.viewHeight, 0, 0);
+      }
 
       // Log into history
       ref.read(historyProvider.notifier).addHistory(widget.profile.id);
@@ -143,13 +162,6 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
 
       // Setup input listening
       _attachInputListener();
-      
-      // Handle resize (xterm window size changes)
-      terminal.onResize = (w, h, pw, ph) {
-        if (w > 0 && h > 0) {
-          shell.resizeTerminal(w, h, pw, ph);
-        }
-      };
 
     } catch (e, stackTrace) {
       debugPrint('TERMINAL ERROR: $e');
@@ -241,6 +253,24 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         ),
         actions: [
           IconButton(
+            icon: Icon(_showSftp ? Icons.folder_off : Icons.folder_shared, color: AppColors.electricCyan),
+            onPressed: () {
+              setState(() {
+                _showSftp = !_showSftp;
+              });
+            },
+            tooltip: 'Toggle SFTP Split View',
+          ),
+          IconButton(
+            icon: Icon(_showMacroBar ? Icons.keyboard_hide : Icons.keyboard, color: AppColors.textDisabled),
+            onPressed: () {
+              setState(() {
+                _showMacroBar = !_showMacroBar;
+              });
+            },
+            tooltip: 'Toggle Macro Bar',
+          ),
+          IconButton(
             icon: const Icon(Icons.zoom_out, color: AppColors.textDisabled),
             onPressed: () {
               setState(() {
@@ -266,23 +296,42 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         ],
       ),
       body: SafeArea(
-        child: Column(
+        child: Row(
           children: [
             Expanded(
-              child: TerminalView(
-                terminal,
-                controller: terminalController,
-                autofocus: true,
-                keyboardType: TextInputType.visiblePassword,
-                backgroundOpacity: 0.0,
-                textStyle: TerminalStyle(
-                  fontFamily: 'JetBrains Mono',
-                  fontSize: _fontSize,
-                ),
-                theme: _buildTerminalTheme(),
+              flex: 2,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: TerminalView(
+                      terminal,
+                      controller: terminalController,
+                      autofocus: true,
+                      hardwareKeyboardOnly: !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS),
+                      keyboardType: TextInputType.text,
+                      backgroundOpacity: 0.0,
+                      textStyle: TerminalStyle(
+                        fontFamily: 'JetBrains Mono',
+                        fontSize: _fontSize,
+                      ),
+                      theme: _buildTerminalTheme(),
+                    ),
+                  ),
+                  if (_showMacroBar)
+                    _buildMacroKeybar(),
+                ],
               ),
             ),
-            _buildMacroKeybar(),
+            if (_showSftp) ...[
+              Container(width: 1, color: AppColors.surfaceBorder),
+              Expanded(
+                flex: 1,
+                child: SftpScreen(
+                  profile: widget.profile,
+                  isEmbedded: true,
+                ),
+              ),
+            ],
           ],
         ),
       ),
