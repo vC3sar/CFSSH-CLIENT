@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
 
 import 'file_editor_screen.dart';
 
@@ -29,6 +30,105 @@ class SftpScreen extends ConsumerStatefulWidget {
 
 class _SftpScreenState extends ConsumerState<SftpScreen> {
   bool? _isVerticalLayout;
+  
+  final Set<String> _selectedLocalItems = {};
+  String? _lastSelectedLocalItem;
+  
+  final Set<String> _selectedRemoteItems = {};
+  String? _lastSelectedRemoteItem;
+
+  final ScrollController _localScrollController = ScrollController();
+  final ScrollController _remoteScrollController = ScrollController();
+  Offset? _localDragStart;
+  Offset? _localDragCurrent;
+  Offset? _remoteDragStart;
+  Offset? _remoteDragCurrent;
+
+  @override
+  void dispose() {
+    _localScrollController.dispose();
+    _remoteScrollController.dispose();
+    super.dispose();
+  }
+
+  void _updateMarqueeSelection({
+    required bool isLocal,
+    required List<String> allKeys,
+  }) {
+    final start = isLocal ? _localDragStart : _remoteDragStart;
+    final current = isLocal ? _localDragCurrent : _remoteDragCurrent;
+    final controller = isLocal ? _localScrollController : _remoteScrollController;
+    if (start == null || current == null || !controller.hasClients) return;
+
+    final selectionRect = Rect.fromPoints(start, current);
+    final scrollOffset = controller.offset;
+    final double itemHeight = 72.0;
+
+    final newSelection = <String>{};
+    for (int i = 0; i < allKeys.length; i++) {
+      final itemYStart = i * itemHeight - scrollOffset;
+      final itemYEnd = (i + 1) * itemHeight - scrollOffset;
+      if (selectionRect.bottom >= itemYStart && selectionRect.top <= itemYEnd) {
+        newSelection.add(allKeys[i]);
+      }
+    }
+
+    setState(() {
+      final selectedItems = isLocal ? _selectedLocalItems : _selectedRemoteItems;
+      selectedItems.clear();
+      selectedItems.addAll(newSelection);
+    });
+  }
+
+  void _handleSelection({
+    required bool isLocal,
+    required String itemKey,
+    required int index,
+    required List<String> allKeys,
+  }) {
+    final keysPressed = HardwareKeyboard.instance.logicalKeysPressed;
+    final isCtrlPressed = keysPressed.contains(LogicalKeyboardKey.controlLeft) || keysPressed.contains(LogicalKeyboardKey.controlRight);
+    final isShiftPressed = keysPressed.contains(LogicalKeyboardKey.shiftLeft) || keysPressed.contains(LogicalKeyboardKey.shiftRight);
+
+    setState(() {
+      final selectedItems = isLocal ? _selectedLocalItems : _selectedRemoteItems;
+      final lastSelected = isLocal ? _lastSelectedLocalItem : _lastSelectedRemoteItem;
+
+      if (isShiftPressed && lastSelected != null) {
+        final startIndex = allKeys.indexOf(lastSelected);
+        final endIndex = index;
+        if (startIndex != -1 && endIndex != -1) {
+          selectedItems.clear();
+          final minIdx = startIndex < endIndex ? startIndex : endIndex;
+          final maxIdx = startIndex > endIndex ? startIndex : endIndex;
+          for (int i = minIdx; i <= maxIdx; i++) {
+            selectedItems.add(allKeys[i]);
+          }
+        }
+      } else if (isCtrlPressed) {
+        if (selectedItems.contains(itemKey)) {
+          selectedItems.remove(itemKey);
+        } else {
+          selectedItems.add(itemKey);
+          if (isLocal) _lastSelectedLocalItem = itemKey;
+          else _lastSelectedRemoteItem = itemKey;
+        }
+      } else {
+        selectedItems.clear();
+        selectedItems.add(itemKey);
+        if (isLocal) _lastSelectedLocalItem = itemKey;
+        else _lastSelectedRemoteItem = itemKey;
+      }
+    });
+  }
+
+  bool _getUseVertical(BuildContext context) {
+    if (_isVerticalLayout != null) return _isVerticalLayout!;
+    final screenWidth = MediaQuery.of(context).size.width;
+    // If embedded (e.g. in Terminal split), it takes roughly half the screen width.
+    final availableWidth = widget.isEmbedded ? (screenWidth / 2) : screenWidth;
+    return availableWidth <= 700;
+  }
 
   @override
   void initState() {
@@ -60,14 +160,13 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
               ),
               actions: [
                 IconButton(
-                  icon: (_isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700))
+                  icon: _getUseVertical(context)
                       ? const Icon(IconRegistry.layoutSideBySide, color: AppColors.electricCyan)
                       : const Icon(IconRegistry.layoutStacked, color: AppColors.electricCyan),
                   tooltip: 'Cambiar Diseño',
                   onPressed: () {
                     setState(() {
-                      final current = _isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700);
-                      _isVerticalLayout = !current;
+                      _isVerticalLayout = !_getUseVertical(context);
                     });
                   },
                 ),
@@ -75,18 +174,11 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
               ],
             ),
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth > 700;
-            final useVertical = _isVerticalLayout ?? !isWide;
-            
-            return ResizableSplit(
-              isVertical: useVertical,
-              initialRatio: 0.5,
-              child1: _buildLocalView(context),
-              child2: _buildRemoteView(context),
-            );
-          },
+        child: ResizableSplit(
+          isVertical: _getUseVertical(context),
+          initialRatio: 0.5,
+          child1: _buildLocalView(context),
+          child2: _buildRemoteView(context),
         ),
       ),
     );
@@ -216,21 +308,29 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
             children: [
               _buildPathBar(
                 path: state.currentPath,
-                onPathChanged: (newPath) => notifier.loadDirectory(newPath),
-                onUp: notifier.navigateUp,
-                onRefresh: notifier.refresh,
+                onPathChanged: (newPath) {
+                  setState(() => _selectedLocalItems.clear());
+                  notifier.loadDirectory(newPath);
+                },
+                onUp: () {
+                  setState(() => _selectedLocalItems.clear());
+                  notifier.navigateUp();
+                },
+                onRefresh: () {
+                  setState(() => _selectedLocalItems.clear());
+                  notifier.refresh();
+                },
                 title: 'Local Workspace',
                 highlight: candidateData.isNotEmpty,
                 extraActions: [
                   IconButton(
-                    icon: (_isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700))
+                    icon: _getUseVertical(context)
                         ? const Icon(IconRegistry.layoutSideBySide, size: 20, color: AppColors.electricCyan)
                         : const Icon(IconRegistry.layoutStacked, size: 20, color: AppColors.electricCyan),
                     tooltip: 'Cambiar Diseño (Lado a lado / Arriba y Abajo)',
                     onPressed: () {
                       setState(() {
-                        final current = _isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700);
-                        _isVerticalLayout = !current;
+                        _isVerticalLayout = !_getUseVertical(context);
                       });
                     },
                     constraints: const BoxConstraints(),
@@ -247,10 +347,44 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
               ),
               if (state.error != null) _buildErrorBar(state.error!),
               Expanded(
-                child: state.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : GestureDetector(
+                child: Stack(
+                  children: [
+                    GestureDetector(
                         behavior: HitTestBehavior.translucent,
+                        onTap: () {
+                          setState(() {
+                            _selectedLocalItems.clear();
+                            _lastSelectedLocalItem = null;
+                          });
+                        },
+                        onPanStart: (details) {
+                          final keysPressed = HardwareKeyboard.instance.logicalKeysPressed;
+                          final isCtrl = keysPressed.contains(LogicalKeyboardKey.controlLeft) || keysPressed.contains(LogicalKeyboardKey.controlRight);
+                          if (!isCtrl) {
+                            setState(() {
+                              _selectedLocalItems.clear();
+                            });
+                          }
+                          setState(() {
+                            _localDragStart = details.localPosition;
+                            _localDragCurrent = details.localPosition;
+                          });
+                        },
+                        onPanUpdate: (details) {
+                          setState(() {
+                            _localDragCurrent = details.localPosition;
+                          });
+                          _updateMarqueeSelection(
+                            isLocal: true,
+                            allKeys: state.items.map((e) => e.path).toList(),
+                          );
+                        },
+                        onPanEnd: (details) {
+                          setState(() {
+                            _localDragStart = null;
+                            _localDragCurrent = null;
+                          });
+                        },
                         onSecondaryTapUp: (details) {
                           showMenu<String>(
                             context: context,
@@ -273,6 +407,8 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                           });
                         },
                         child: ListView.builder(
+                          controller: _localScrollController,
+                          itemExtent: 72.0,
                           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                           itemCount: state.items.length,
                           itemBuilder: (context, index) {
@@ -282,15 +418,18 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                             
                             
                             void showLocalItemMenu(TapUpDetails details) {
+                              final isMultiSelect = _selectedLocalItems.length > 1;
                               showMenu<String>(
                                 context: context,
                                 position: RelativeRect.fromLTRB(details.globalPosition.dx, details.globalPosition.dy, details.globalPosition.dx, details.globalPosition.dy),
                                 items: [
-                                  if (!isDir) const PopupMenuItem(value: 'upload', child: Text('Subir al Remoto')),
-                                  if (!isDir) const PopupMenuItem(value: 'edit', child: Text('Editar Archivo')),
-                                  if (!isDir) const PopupMenuItem(value: 'external', child: Text('Abrir Externamente')),
-                                  if (!isDir) const PopupMenuItem(value: 'export', child: Text('Export File (SAF)')),
-                                  const PopupMenuItem(value: 'delete', child: Text('Eliminar', style: TextStyle(color: AppColors.softCrimson))),
+                                  if (!isDir && !isMultiSelect) const PopupMenuItem(value: 'upload', child: Text('Subir al Remoto')),
+                                  if (!isDir && !isMultiSelect) const PopupMenuItem(value: 'edit', child: Text('Editar Archivo')),
+                                  if (!isDir && !isMultiSelect) const PopupMenuItem(value: 'external', child: Text('Abrir Externamente')),
+                                  if (!isDir && !isMultiSelect) const PopupMenuItem(value: 'export', child: Text('Export File (SAF)')),
+                                  if (isMultiSelect) PopupMenuItem(value: 'multi_upload', child: Text('Subir ${_selectedLocalItems.length} elementos (solo archivos)')),
+                                  if (isMultiSelect) PopupMenuItem(value: 'multi_delete', child: Text('Eliminar ${_selectedLocalItems.length} elementos', style: TextStyle(color: AppColors.softCrimson))),
+                                  if (!isMultiSelect) const PopupMenuItem(value: 'delete', child: Text('Eliminar', style: TextStyle(color: AppColors.softCrimson))),
                                 ],
                               ).then((val) async {
                                 if (val == 'upload') {
@@ -304,14 +443,46 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                                   await notifier.exportToSaf(item as File);
                                 } else if (val == 'delete') {
                                   await notifier.deleteEntity(item);
+                                } else if (val == 'multi_delete') {
+                                  for (final path in _selectedLocalItems.toList()) {
+                                    final entity = FileSystemEntity.isDirectorySync(path) ? Directory(path) : File(path);
+                                    await notifier.deleteEntity(entity);
+                                  }
+                                  setState(() => _selectedLocalItems.clear());
+                                } else if (val == 'multi_upload') {
+                                  final remoteState = ref.read(sftpProvider(widget.profile));
+                                  for (final path in _selectedLocalItems.toList()) {
+                                    if (!FileSystemEntity.isDirectorySync(path)) {
+                                      final name = p.basename(path);
+                                      await _uploadWithPrompt(path, name, remoteState.currentPath);
+                                    }
+                                  }
+                                  setState(() => _selectedLocalItems.clear());
                                 }
                               });
                             }
 
                             Widget listTile = GestureDetector(
                               behavior: HitTestBehavior.opaque,
-                              onSecondaryTapUp: showLocalItemMenu,
+                              onSecondaryTapUp: (details) {
+                                if (!_selectedLocalItems.contains(item.path)) {
+                                  setState(() {
+                                    _selectedLocalItems.clear();
+                                    _selectedLocalItems.add(item.path);
+                                    _lastSelectedLocalItem = item.path;
+                                  });
+                                }
+                                showLocalItemMenu(details);
+                              },
                               child: InkWell(
+                                onTap: () {
+                                  _handleSelection(
+                                    isLocal: true,
+                                    itemKey: item.path,
+                                    index: index,
+                                    allKeys: state.items.map((e) => e.path).toList(),
+                                  );
+                                },
                                 onDoubleTap: () {
                                   if (isDir) {
                                     notifier.loadDirectory(item.path);
@@ -319,8 +490,12 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                                     _editLocalFile(item.path, filename);
                                   }
                                 },
-                                child: ListTile(
-                                  enabled: true,
+                                child: Container(
+                                  color: _selectedLocalItems.contains(item.path)
+                                      ? AppColors.electricCyan.withOpacity(0.15)
+                                      : null,
+                                  child: ListTile(
+                                    enabled: true,
                                   leading: Icon(
                                     isDir ? IconRegistry.localFolder : IconRegistry.localFile,
                                     color: isDir ? AppColors.subtleAmber : AppColors.textSecondary,
@@ -328,6 +503,7 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                                   title: Text(filename, style: AppTextStyles.bodyLarge),
                                   subtitle: Text(isDir ? 'Directory' : _formatSize(File(item.path).lengthSync())),
                                   trailing: isDir ? null : const Icon(Icons.more_vert, color: AppColors.textSecondary),
+                                  ),
                                 ),
                               ),
                             );
@@ -352,6 +528,22 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                         },
                       ),
                     ),
+                    if (_localDragStart != null && _localDragCurrent != null)
+                      Positioned.fromRect(
+                        rect: Rect.fromPoints(_localDragStart!, _localDragCurrent!),
+                        child: IgnorePointer(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.electricCyan.withOpacity(0.2),
+                              border: Border.all(color: AppColors.electricCyan, width: 1),
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (state.isLoading)
+                      const Center(child: CircularProgressIndicator()),
+                  ],
+                ),
               ),
             ],
           );
@@ -388,21 +580,29 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
             children: [
               _buildPathBar(
                 path: state.currentPath,
-                onPathChanged: (newPath) => notifier.loadDirectory(newPath),
-                onUp: notifier.navigateUp,
-                onRefresh: () => notifier.loadDirectory(state.currentPath),
+                onPathChanged: (newPath) {
+                  setState(() => _selectedRemoteItems.clear());
+                  notifier.loadDirectory(newPath);
+                },
+                onUp: () {
+                  setState(() => _selectedRemoteItems.clear());
+                  notifier.navigateUp();
+                },
+                onRefresh: () {
+                  setState(() => _selectedRemoteItems.clear());
+                  notifier.loadDirectory(state.currentPath);
+                },
                 title: 'Remote Server',
                 highlight: candidateData.isNotEmpty,
                 extraActions: [
                   IconButton(
-                    icon: (_isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700))
+                    icon: _getUseVertical(context)
                         ? const Icon(IconRegistry.layoutSideBySide, size: 20, color: AppColors.electricCyan)
                         : const Icon(IconRegistry.layoutStacked, size: 20, color: AppColors.electricCyan),
                     tooltip: 'Cambiar Diseño (Lado a lado / Arriba y Abajo)',
                     onPressed: () {
                       setState(() {
-                        final current = _isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700);
-                        _isVerticalLayout = !current;
+                        _isVerticalLayout = !_getUseVertical(context);
                       });
                     },
                     constraints: const BoxConstraints(),
@@ -412,10 +612,44 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
               ),
               if (state.error != null && state.error!.isNotEmpty) _buildErrorBar(state.error!),
               Expanded(
-                child: state.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : GestureDetector(
+                child: Stack(
+                  children: [
+                    GestureDetector(
                         behavior: HitTestBehavior.translucent,
+                        onTap: () {
+                          setState(() {
+                            _selectedRemoteItems.clear();
+                            _lastSelectedRemoteItem = null;
+                          });
+                        },
+                        onPanStart: (details) {
+                          final keysPressed = HardwareKeyboard.instance.logicalKeysPressed;
+                          final isCtrl = keysPressed.contains(LogicalKeyboardKey.controlLeft) || keysPressed.contains(LogicalKeyboardKey.controlRight);
+                          if (!isCtrl) {
+                            setState(() {
+                              _selectedRemoteItems.clear();
+                            });
+                          }
+                          setState(() {
+                            _remoteDragStart = details.localPosition;
+                            _remoteDragCurrent = details.localPosition;
+                          });
+                        },
+                        onPanUpdate: (details) {
+                          setState(() {
+                            _remoteDragCurrent = details.localPosition;
+                          });
+                          _updateMarqueeSelection(
+                            isLocal: false,
+                            allKeys: state.items.map((e) => e.filename).toList(),
+                          );
+                        },
+                        onPanEnd: (details) {
+                          setState(() {
+                            _remoteDragStart = null;
+                            _remoteDragCurrent = null;
+                          });
+                        },
                         onSecondaryTapUp: (details) {
                           showMenu<String>(
                             context: context,
@@ -438,6 +672,8 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                           });
                         },
                         child: ListView.builder(
+                          controller: _remoteScrollController,
+                          itemExtent: 72.0,
                           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                           itemCount: state.items.length,
                           itemBuilder: (context, index) {
@@ -446,14 +682,17 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                             final filename = item.filename;
 
                             void showRemoteItemMenu(TapUpDetails details) {
+                              final isMultiSelect = _selectedRemoteItems.length > 1;
                               showMenu<String>(
                                 context: context,
                                 position: RelativeRect.fromLTRB(details.globalPosition.dx, details.globalPosition.dy, details.globalPosition.dx, details.globalPosition.dy),
                                 items: [
-                                  if (!isDir) const PopupMenuItem(value: 'download', child: Text('Descargar Localmente')),
-                                  if (!isDir) const PopupMenuItem(value: 'edit', child: Text('Editar Archivo')),
-                                  if (!isDir) const PopupMenuItem(value: 'external', child: Text('Abrir Externamente')),
-                                  const PopupMenuItem(value: 'delete', child: Text('Eliminar', style: TextStyle(color: AppColors.softCrimson))),
+                                  if (!isDir && !isMultiSelect) const PopupMenuItem(value: 'download', child: Text('Descargar Localmente')),
+                                  if (!isDir && !isMultiSelect) const PopupMenuItem(value: 'edit', child: Text('Editar Archivo')),
+                                  if (!isDir && !isMultiSelect) const PopupMenuItem(value: 'external', child: Text('Abrir Externamente')),
+                                  if (isMultiSelect) PopupMenuItem(value: 'multi_download', child: Text('Descargar ${_selectedRemoteItems.length} elementos (solo archivos)')),
+                                  if (isMultiSelect) PopupMenuItem(value: 'multi_delete', child: Text('Eliminar ${_selectedRemoteItems.length} elementos', style: TextStyle(color: AppColors.softCrimson))),
+                                  if (!isMultiSelect) const PopupMenuItem(value: 'delete', child: Text('Eliminar', style: TextStyle(color: AppColors.softCrimson))),
                                 ],
                               ).then((val) async {
                                 if (val == 'download') {
@@ -491,14 +730,68 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                                   _openExternal(tempFile.path);
                                 } else if (val == 'delete') {
                                   await notifier.deleteItem(filename, isDir);
+                                } else if (val == 'multi_delete') {
+                                  for (final it in state.items) {
+                                    if (_selectedRemoteItems.contains(it.filename)) {
+                                      await notifier.deleteItem(it.filename, it.attr.isDirectory);
+                                    }
+                                  }
+                                  setState(() => _selectedRemoteItems.clear());
+                                } else if (val == 'multi_download') {
+                                  for (final it in state.items) {
+                                    if (_selectedRemoteItems.contains(it.filename) && !it.attr.isDirectory) {
+                                      final localDest = p.join(localState.currentPath, it.filename);
+                                      if (File(localDest).existsSync()) {
+                                        final bool? overwrite = await showDialog<bool>(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            backgroundColor: AppColors.surface1,
+                                            title: const Text('Sobreescribir Archivo'),
+                                            content: Text('El archivo "${it.filename}" ya existe localmente. ¿Deseas sobreescribirlo?'),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Omitir')),
+                                              ElevatedButton(
+                                                style: ElevatedButton.styleFrom(backgroundColor: AppColors.electricCyan, foregroundColor: Colors.black),
+                                                onPressed: () => Navigator.pop(context, true),
+                                                child: const Text('Sobreescribir'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (overwrite != true) continue;
+                                      }
+                                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Descargando ${it.filename}...')));
+                                      await notifier.downloadFile(it.filename, localDest);
+                                    }
+                                  }
+                                  await localNotifier.refresh();
+                                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Descargas completadas'), backgroundColor: AppColors.phosphorGreen));
+                                  setState(() => _selectedRemoteItems.clear());
                                 }
                               });
                             }
 
                             Widget listTile = GestureDetector(
                               behavior: HitTestBehavior.opaque,
-                              onSecondaryTapUp: showRemoteItemMenu,
+                              onSecondaryTapUp: (details) {
+                                if (!_selectedRemoteItems.contains(filename)) {
+                                  setState(() {
+                                    _selectedRemoteItems.clear();
+                                    _selectedRemoteItems.add(filename);
+                                    _lastSelectedRemoteItem = filename;
+                                  });
+                                }
+                                showRemoteItemMenu(details);
+                              },
                               child: InkWell(
+                                onTap: () {
+                                  _handleSelection(
+                                    isLocal: false,
+                                    itemKey: filename,
+                                    index: index,
+                                    allKeys: state.items.map((e) => e.filename).toList(),
+                                  );
+                                },
                                 onDoubleTap: () async {
                                   if (isDir) {
                                     String nextPath = state.currentPath == '/' ? '/$filename' : '${state.currentPath}/$filename';
@@ -508,15 +801,20 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                                     await _editRemoteFile(filename, state.currentPath);
                                   }
                                 },
-                                child: ListTile(
-                                  enabled: true,
-                                  leading: Icon(
-                                    isDir ? IconRegistry.remoteFolder : IconRegistry.remoteFile,
-                                    color: isDir ? AppColors.subtleAmber : AppColors.electricCyan,
+                                child: Container(
+                                  color: _selectedRemoteItems.contains(filename)
+                                      ? AppColors.electricCyan.withOpacity(0.15)
+                                      : null,
+                                  child: ListTile(
+                                    enabled: true,
+                                    leading: Icon(
+                                      isDir ? IconRegistry.remoteFolder : IconRegistry.remoteFile,
+                                      color: isDir ? AppColors.subtleAmber : AppColors.electricCyan,
+                                    ),
+                                    title: Text(filename, style: AppTextStyles.bodyLarge),
+                                    subtitle: Text(isDir ? 'Directory' : _formatSize(item.attr.size ?? 0)),
+                                    trailing: isDir ? null : const Icon(Icons.more_vert, color: AppColors.textSecondary),
                                   ),
-                                  title: Text(filename, style: AppTextStyles.bodyLarge),
-                                  subtitle: Text(isDir ? 'Directory' : _formatSize(item.attr.size ?? 0)),
-                                  trailing: isDir ? null : const Icon(Icons.more_vert, color: AppColors.textSecondary),
                                 ),
                               ),
                             );
@@ -541,6 +839,22 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                         },
                       ),
                     ),
+                    if (_remoteDragStart != null && _remoteDragCurrent != null)
+                      Positioned.fromRect(
+                        rect: Rect.fromPoints(_remoteDragStart!, _remoteDragCurrent!),
+                        child: IgnorePointer(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.electricCyan.withOpacity(0.2),
+                              border: Border.all(color: AppColors.electricCyan, width: 1),
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (state.isLoading)
+                      const Center(child: CircularProgressIndicator()),
+                  ],
+                ),
               ),
             ],
           );

@@ -38,8 +38,33 @@ class SshSessionState {
   int reconnectAttempts = 0;
   int lastCols = 80;
   int lastRows = 24;
+  
+  final StringBuffer _outputBuffer = StringBuffer();
+  bool _isFlushingOutput = false;
 
   SshSessionState(this.profile);
+  
+  void queueOutput(String text) {
+    _outputBuffer.write(text);
+    if (!_isFlushingOutput) {
+      _flushOutput();
+    }
+  }
+
+  Future<void> _flushOutput() async {
+    _isFlushingOutput = true;
+    while (_outputBuffer.isNotEmpty) {
+      final chunk = _outputBuffer.toString();
+      _outputBuffer.clear();
+      
+      terminal.write(chunk);
+      
+      // Yield to the event loop, giving Flutter time to paint frames
+      // and process new SSH network events.
+      await Future.delayed(Duration.zero);
+    }
+    _isFlushingOutput = false;
+  }
 }
 
 class SshEngine extends ChangeNotifier {
@@ -101,13 +126,21 @@ class SshEngine extends ChangeNotifier {
         throw Exception('No SSH Key selected or private key could not be loaded. Please assign a valid key in Servers.');
       }
 
+      bool passwordTried = false;
+
       state.client = SSHClient(
         socket,
         username: profile.username,
         keepAliveInterval: profile.keepalive > 0 ? Duration(seconds: profile.keepalive) : null,
         identities: identities,
         onPasswordRequest: profile.authMethod == 'password'
-            ? () => pass ?? ''
+            ? () {
+                if (passwordTried) {
+                  throw Exception('Authentication failed: Invalid password.');
+                }
+                passwordTried = true;
+                return pass ?? '';
+              }
             : null,
         onVerifyHostKey: (String algorithm, Uint8List rawFingerprint) async {
           final sha256 = hostKeyManager.computeSHA256Fingerprint(rawFingerprint);
@@ -276,11 +309,11 @@ class SshEngine extends ChangeNotifier {
     
     // Attach stream listeners only once
     state.shell!.stdout.cast<List<int>>().transform(const Utf8Decoder(allowMalformed: true)).listen((String text) {
-      state.terminal.write(text);
+      state.queueOutput(text);
     });
 
     state.shell!.stderr.cast<List<int>>().transform(const Utf8Decoder(allowMalformed: true)).listen((String text) {
-      state.terminal.write(text);
+      state.queueOutput(text);
     });
     
     return state.shell!;

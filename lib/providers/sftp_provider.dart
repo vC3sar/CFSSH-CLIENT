@@ -227,6 +227,14 @@ class SftpNotifier extends StateNotifier<SftpState> {
       state = state.copyWith(error: 'Failed to delete: $e', isLoading: false);
     }
   }
+
+  @override
+  void dispose() {
+    try {
+      _sftpClient?.close();
+    } catch (_) {}
+    super.dispose();
+  }
 }
 
 final sftpProvider = StateNotifierProvider.autoDispose.family<SftpNotifier, SftpState, ConnectionProfile>((ref, profile) {

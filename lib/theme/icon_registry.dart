@@ -19,13 +19,13 @@ class IconRegistry {
 
   // ── Terminal screen (dynamic) ──────────────────────────────────────────────
   static const IconData sftpOn  = Icons.folder_shared;
-  static const IconData sftpOff = Icons.folder_off;
+  static const IconData sftpOff = Icons.folder_open;
 
   static const IconData macroBarOn  = Icons.keyboard;
   static const IconData macroBarOff = Icons.keyboard_hide;
 
   // ── SFTP layout toggle (dynamic) ──────────────────────────────────────────
-  static const IconData layoutSideBySide = Icons.splitscreen;
+  static const IconData layoutSideBySide = Icons.horizontal_distribute;
   static const IconData layoutStacked    = Icons.table_rows;
 
   // ── SFTP file list (dynamic per item type) ─────────────────────────────────

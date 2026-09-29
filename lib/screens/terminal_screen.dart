@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -30,6 +31,7 @@ class TerminalScreen extends ConsumerStatefulWidget {
 class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   late Terminal terminal;
   final terminalController = TerminalController();
+  Timer? _resizeTimer;
   late final SshEngine _sshEngine;
   bool _isConnected = false;
   String _statusMessage = 'Connecting...';
@@ -136,8 +138,13 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       // Assign onResize early so any layout changes are captured
       terminal.onResize = (w, h, pw, ph) {
         if (w > 0 && h > 0) {
-          final s = _sshEngine.getSession(widget.profile.id)?.shell;
-          s?.resizeTerminal(w, h, pw, ph);
+          _resizeTimer?.cancel();
+          _resizeTimer = Timer(const Duration(milliseconds: 250), () {
+            if (mounted) {
+              final s = _sshEngine.getSession(widget.profile.id)?.shell;
+              s?.resizeTerminal(w, h, pw, ph);
+            }
+          });
         }
       };
 
@@ -203,6 +210,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     // We NO LONGER disconnect here. The session stays active in background.
     // _sshEngine.disconnect(widget.profile.id);
     
+    _resizeTimer?.cancel();
     // Clear the onOutput callback so it doesn't hold references to this disposed screen
     terminal.onOutput = null;
     super.dispose();
