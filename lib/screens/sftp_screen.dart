@@ -14,6 +14,7 @@ import '../providers/local_file_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/host_key_dialogs.dart';
+import '../widgets/resizable_split.dart';
 
 class SftpScreen extends ConsumerStatefulWidget {
   final ConnectionProfile profile;
@@ -56,6 +57,19 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                   Expanded(child: Text(widget.profile.name, overflow: TextOverflow.ellipsis)),
                 ],
               ),
+              actions: [
+                IconButton(
+                  icon: Icon((_isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700)) ? Icons.vertical_split : Icons.horizontal_split, color: AppColors.electricCyan),
+                  tooltip: 'Cambiar Diseño',
+                  onPressed: () {
+                    setState(() {
+                      final current = _isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700);
+                      _isVerticalLayout = !current;
+                    });
+                  },
+                ),
+                const SizedBox(width: 8),
+              ],
             ),
       body: SafeArea(
         child: LayoutBuilder(
@@ -63,23 +77,12 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
             final isWide = constraints.maxWidth > 700;
             final useVertical = _isVerticalLayout ?? !isWide;
             
-            if (!useVertical) {
-              return Row(
-                children: [
-                  Expanded(child: _buildLocalView(context)),
-                  Container(width: 1, color: AppColors.surfaceBorder),
-                  Expanded(child: _buildRemoteView(context)),
-                ],
-              );
-            } else {
-              return Column(
-                children: [
-                  Expanded(child: _buildLocalView(context)),
-                  Container(height: 1, color: AppColors.surfaceBorder),
-                  Expanded(child: _buildRemoteView(context)),
-                ],
-              );
-            }
+            return ResizableSplit(
+              isVertical: useVertical,
+              initialRatio: 0.5,
+              child1: _buildLocalView(context),
+              child2: _buildRemoteView(context),
+            );
           },
         ),
       ),
@@ -217,7 +220,7 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                 highlight: candidateData.isNotEmpty,
                 extraActions: [
                   IconButton(
-                    icon: Icon((_isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700)) ? Icons.view_column : Icons.view_agenda, size: 20, color: AppColors.subtleAmber),
+                    icon: Icon((_isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700)) ? Icons.vertical_split : Icons.horizontal_split, size: 20, color: AppColors.electricCyan),
                     tooltip: 'Cambiar Diseño (Lado a lado / Arriba y Abajo)',
                     onPressed: () {
                       setState(() {
@@ -278,11 +281,11 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                                 context: context,
                                 position: RelativeRect.fromLTRB(details.globalPosition.dx, details.globalPosition.dy, details.globalPosition.dx, details.globalPosition.dy),
                                 items: [
-                                  const PopupMenuItem(value: 'upload', child: Text('Subir al Remoto')),
+                                  if (!isDir) const PopupMenuItem(value: 'upload', child: Text('Subir al Remoto')),
                                   if (!isDir) const PopupMenuItem(value: 'edit', child: Text('Editar Archivo')),
                                   if (!isDir) const PopupMenuItem(value: 'external', child: Text('Abrir Externamente')),
                                   if (!isDir) const PopupMenuItem(value: 'export', child: Text('Export File (SAF)')),
-                                  const PopupMenuItem(value: 'delete', child: Text('Delete Local', style: TextStyle(color: AppColors.softCrimson))),
+                                  const PopupMenuItem(value: 'delete', child: Text('Eliminar', style: TextStyle(color: AppColors.softCrimson))),
                                 ],
                               ).then((val) async {
                                 if (val == 'upload') {
@@ -304,7 +307,6 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                               behavior: HitTestBehavior.opaque,
                               onSecondaryTapUp: showLocalItemMenu,
                               child: InkWell(
-                                onTapUp: showLocalItemMenu,
                                 onDoubleTap: () {
                                   if (isDir) {
                                     notifier.loadDirectory(item.path);
@@ -386,6 +388,20 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                 onRefresh: () => notifier.loadDirectory(state.currentPath),
                 title: 'Remote Server',
                 highlight: candidateData.isNotEmpty,
+                extraActions: [
+                  IconButton(
+                    icon: Icon((_isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700)) ? Icons.vertical_split : Icons.horizontal_split, size: 20, color: AppColors.electricCyan),
+                    tooltip: 'Cambiar Diseño (Lado a lado / Arriba y Abajo)',
+                    onPressed: () {
+                      setState(() {
+                        final current = _isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700);
+                        _isVerticalLayout = !current;
+                      });
+                    },
+                    constraints: const BoxConstraints(),
+                    padding: const EdgeInsets.all(8),
+                  ),
+                ],
               ),
               if (state.error != null && state.error!.isNotEmpty) _buildErrorBar(state.error!),
               Expanded(
@@ -430,6 +446,7 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                                   if (!isDir) const PopupMenuItem(value: 'download', child: Text('Descargar Localmente')),
                                   if (!isDir) const PopupMenuItem(value: 'edit', child: Text('Editar Archivo')),
                                   if (!isDir) const PopupMenuItem(value: 'external', child: Text('Abrir Externamente')),
+                                  const PopupMenuItem(value: 'delete', child: Text('Eliminar', style: TextStyle(color: AppColors.softCrimson))),
                                 ],
                               ).then((val) async {
                                 if (val == 'download') {
@@ -465,6 +482,8 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Descargando para abrir...')));
                                   await notifier.downloadFile(filename, tempFile.path);
                                   _openExternal(tempFile.path);
+                                } else if (val == 'delete') {
+                                  await notifier.deleteItem(filename, isDir);
                                 }
                               });
                             }
@@ -473,7 +492,6 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                               behavior: HitTestBehavior.opaque,
                               onSecondaryTapUp: showRemoteItemMenu,
                               child: InkWell(
-                                onTapUp: showRemoteItemMenu,
                                 onDoubleTap: () async {
                                   if (isDir) {
                                     String nextPath = state.currentPath == '/' ? '/$filename' : '${state.currentPath}/$filename';
@@ -547,8 +565,9 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
         children: [
           Row(
             children: [
-              Text(title, style: AppTextStyles.labelMedium.copyWith(color: AppColors.textSecondary)),
-              const Spacer(),
+              Expanded(
+                child: Text(title, style: AppTextStyles.labelMedium.copyWith(color: AppColors.textSecondary), overflow: TextOverflow.ellipsis),
+              ),
               if (extraActions != null) ...extraActions,
               IconButton(
                 icon: const Icon(Icons.refresh, size: 20, color: AppColors.textSecondary),

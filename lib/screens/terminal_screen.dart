@@ -14,6 +14,7 @@ import '../services/ssh_engine.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/host_key_dialogs.dart';
+import '../widgets/resizable_split.dart';
 import 'sftp_screen.dart';
 
 class TerminalScreen extends ConsumerStatefulWidget {
@@ -296,45 +297,41 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         ],
       ),
       body: SafeArea(
-        child: Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: Column(
-                children: [
-                  Expanded(
-                    child: TerminalView(
-                      terminal,
-                      controller: terminalController,
-                      autofocus: true,
-                      hardwareKeyboardOnly: !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS),
-                      keyboardType: TextInputType.text,
-                      backgroundOpacity: 0.0,
-                      textStyle: TerminalStyle(
-                        fontFamily: 'JetBrains Mono',
-                        fontSize: _fontSize,
-                      ),
-                      theme: _buildTerminalTheme(),
-                    ),
-                  ),
-                  if (_showMacroBar)
-                    _buildMacroKeybar(),
-                ],
-              ),
-            ),
-            if (_showSftp) ...[
-              Container(width: 1, color: AppColors.surfaceBorder),
-              Expanded(
-                flex: 1,
-                child: SftpScreen(
+        child: _showSftp
+            ? ResizableSplit(
+                isVertical: false,
+                initialRatio: 0.6,
+                child1: _buildTerminalContent(),
+                child2: SftpScreen(
                   profile: widget.profile,
                   isEmbedded: true,
                 ),
-              ),
-            ],
-          ],
-        ),
+              )
+            : _buildTerminalContent(),
       ),
+    );
+  }
+
+  Widget _buildTerminalContent() {
+    return Column(
+      children: [
+        Expanded(
+          child: TerminalView(
+            terminal,
+            controller: terminalController,
+            autofocus: true,
+            hardwareKeyboardOnly: !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS),
+            keyboardType: TextInputType.text,
+            backgroundOpacity: 0.0,
+            textStyle: TerminalStyle(
+              fontFamily: 'JetBrains Mono',
+              fontSize: _fontSize,
+            ),
+            theme: _buildTerminalTheme(),
+          ),
+        ),
+        if (_showMacroBar) _buildMacroKeybar(),
+      ],
     );
   }
 
