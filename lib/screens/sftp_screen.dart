@@ -15,6 +15,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/host_key_dialogs.dart';
 import '../widgets/resizable_split.dart';
+import '../theme/icon_registry.dart';
 
 class SftpScreen extends ConsumerStatefulWidget {
   final ConnectionProfile profile;
@@ -59,7 +60,9 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
               ),
               actions: [
                 IconButton(
-                  icon: Icon((_isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700)) ? Icons.vertical_split : Icons.horizontal_split, color: AppColors.electricCyan),
+                  icon: (_isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700))
+                      ? const Icon(IconRegistry.layoutSideBySide, color: AppColors.electricCyan)
+                      : const Icon(IconRegistry.layoutStacked, color: AppColors.electricCyan),
                   tooltip: 'Cambiar Diseño',
                   onPressed: () {
                     setState(() {
@@ -220,7 +223,9 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                 highlight: candidateData.isNotEmpty,
                 extraActions: [
                   IconButton(
-                    icon: Icon((_isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700)) ? Icons.vertical_split : Icons.horizontal_split, size: 20, color: AppColors.electricCyan),
+                    icon: (_isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700))
+                        ? const Icon(IconRegistry.layoutSideBySide, size: 20, color: AppColors.electricCyan)
+                        : const Icon(IconRegistry.layoutStacked, size: 20, color: AppColors.electricCyan),
                     tooltip: 'Cambiar Diseño (Lado a lado / Arriba y Abajo)',
                     onPressed: () {
                       setState(() {
@@ -317,7 +322,7 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                                 child: ListTile(
                                   enabled: true,
                                   leading: Icon(
-                                    isDir ? Icons.folder : Icons.insert_drive_file,
+                                    isDir ? IconRegistry.localFolder : IconRegistry.localFile,
                                     color: isDir ? AppColors.subtleAmber : AppColors.textSecondary,
                                   ),
                                   title: Text(filename, style: AppTextStyles.bodyLarge),
@@ -390,7 +395,9 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                 highlight: candidateData.isNotEmpty,
                 extraActions: [
                   IconButton(
-                    icon: Icon((_isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700)) ? Icons.vertical_split : Icons.horizontal_split, size: 20, color: AppColors.electricCyan),
+                    icon: (_isVerticalLayout ?? !(MediaQuery.of(context).size.width > 700))
+                        ? const Icon(IconRegistry.layoutSideBySide, size: 20, color: AppColors.electricCyan)
+                        : const Icon(IconRegistry.layoutStacked, size: 20, color: AppColors.electricCyan),
                     tooltip: 'Cambiar Diseño (Lado a lado / Arriba y Abajo)',
                     onPressed: () {
                       setState(() {
@@ -504,7 +511,7 @@ class _SftpScreenState extends ConsumerState<SftpScreen> {
                                 child: ListTile(
                                   enabled: true,
                                   leading: Icon(
-                                    isDir ? Icons.folder : Icons.cloud_circle,
+                                    isDir ? IconRegistry.remoteFolder : IconRegistry.remoteFile,
                                     color: isDir ? AppColors.subtleAmber : AppColors.electricCyan,
                                   ),
                                   title: Text(filename, style: AppTextStyles.bodyLarge),

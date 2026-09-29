@@ -15,6 +15,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/host_key_dialogs.dart';
 import '../widgets/resizable_split.dart';
+import '../theme/icon_registry.dart';
 import 'sftp_screen.dart';
 
 class TerminalScreen extends ConsumerStatefulWidget {
@@ -254,7 +255,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(_showSftp ? Icons.folder_off : Icons.folder_shared, color: AppColors.electricCyan),
+            icon: Icon(_showSftp ? IconRegistry.sftpOn : IconRegistry.sftpOff, color: AppColors.electricCyan),
             onPressed: () {
               setState(() {
                 _showSftp = !_showSftp;
@@ -263,7 +264,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
             tooltip: 'Toggle SFTP Split View',
           ),
           IconButton(
-            icon: Icon(_showMacroBar ? Icons.keyboard_hide : Icons.keyboard, color: AppColors.textDisabled),
+            icon: Icon(_showMacroBar ? IconRegistry.macroBarOff : IconRegistry.macroBarOn, color: AppColors.textDisabled),
             onPressed: () {
               setState(() {
                 _showMacroBar = !_showMacroBar;
