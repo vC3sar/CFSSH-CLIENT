@@ -24,6 +24,20 @@ class IconRegistry {
   static const IconData macroBarOn  = Icons.keyboard;
   static const IconData macroBarOff = Icons.keyboard_hide;
 
+  static const IconData cursorPadOn  = Icons.gamepad;
+  static const IconData cursorPadOff = Icons.open_with;
+
+  static const IconData copy      = Icons.content_copy;
+  static const IconData cut       = Icons.content_cut;
+  static const IconData paste     = Icons.content_paste;
+  static const IconData selectAll = Icons.select_all;
+  static const IconData clear     = Icons.clear_all;
+
+  // ── QR Share & Import ─────────────────────────────────────────────────────
+  static const IconData qrShare   = Icons.qr_code_2;
+  static const IconData qrScan    = Icons.qr_code_scanner;
+  static const IconData warning   = Icons.warning_amber_rounded;
+
   // ── SFTP layout toggle (dynamic) ──────────────────────────────────────────
   static const IconData layoutSideBySide = Icons.horizontal_distribute;
   static const IconData layoutStacked    = Icons.table_rows;

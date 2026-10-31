@@ -7,6 +7,8 @@ import '../services/ssh_engine.dart';
 import '../models/connection_profile.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../theme/icon_registry.dart';
+import '../widgets/host_share_dialogs.dart';
 import 'terminal_screen.dart';
 import 'keys_screen.dart';
 import '../security/secure_storage.dart';
@@ -26,6 +28,13 @@ class ConnectionsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Connection Manager'),
         actions: [
+          IconButton(
+            icon: const Icon(IconRegistry.qrScan, color: AppColors.phosphorGreen),
+            tooltip: 'Import Host via QR',
+            onPressed: () {
+              HostShareDialogs.showImportHostDialog(context, ref);
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.key, color: AppColors.electricCyan),
             tooltip: 'SSH Keys',
@@ -76,11 +85,27 @@ class ConnectionsScreen extends ConsumerWidget {
             const Icon(Icons.dns_outlined, size: 64, color: AppColors.textDisabled),
             const SizedBox(height: 16),
             Text('No saved connections', style: AppTextStyles.headlineSmall),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: () => _showProfileEditor(context, ref, null),
-              icon: const Icon(Icons.add),
-              label: const Text('Add Server'),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              alignment: WrapAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () => _showProfileEditor(context, ref, null),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Server'),
+                ),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.electricCyan,
+                    side: const BorderSide(color: AppColors.electricCyan),
+                  ),
+                  onPressed: () => HostShareDialogs.showImportHostDialog(context, ref),
+                  icon: const Icon(IconRegistry.qrScan),
+                  label: const Text('Import via QR'),
+                ),
+              ],
             ),
           ],
         ),
@@ -157,8 +182,20 @@ class ConnectionsScreen extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
+                  icon: const Icon(
+                    IconRegistry.qrShare,
+                    size: 19,
+                    color: AppColors.electricCyan,
+                  ),
+                  padding: const EdgeInsets.all(6),
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Share Host via QR',
+                  onPressed: () => HostShareDialogs.showShareHostDialog(context, profile),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
                   icon: const Icon(Icons.edit, size: 18),
-                  padding: EdgeInsets.zero,
+                  padding: const EdgeInsets.all(6),
                   constraints: const BoxConstraints(),
                   tooltip: 'Edit Server',
                   onPressed: () => _showProfileEditor(context, ref, profile),
@@ -278,7 +315,7 @@ class _ProfileEditorState extends ConsumerState<_ProfileEditor> {
     );
 
     // Save password asynchronously if authMethod is password
-    if (_authMethod == 'password') {
+    if (_authMethod == 'password' && (widget.profile == null || pass.isNotEmpty)) {
       final secureStorage = SecureStorage();
       await secureStorage.savePassword(id, pass);
     }

@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:xterm/xterm.dart';
@@ -21,11 +20,70 @@ typedef HostKeyVerificationCallback = Future<bool> Function(
 
 enum SshSessionStatus { disconnected, connecting, connected, reconnecting, disconnecting, error }
 
+/// Custom input handler that fixes xterm 4.0.0's DECCKM (cursorKeysMode) check
+/// and adds standard word-deletion sequences (Ctrl+Backspace, Alt+Backspace, etc.).
+class CfsshTerminalInputHandler implements TerminalInputHandler {
+  const CfsshTerminalInputHandler();
+
+  @override
+  String? call(TerminalKeyboardEvent event) {
+    final noModifiers = !event.ctrl && !event.alt && !event.shift;
+
+    // Fix xterm-4.0.0 bug where KeytabInputHandler checks appKeypadMode instead
+    // of cursorKeysMode for DECCKM cursor keys.
+    if (noModifiers && event.state.cursorKeysMode) {
+      switch (event.key) {
+        case TerminalKey.arrowUp:
+          return '\x1bOA';
+        case TerminalKey.arrowDown:
+          return '\x1bOB';
+        case TerminalKey.arrowRight:
+          return '\x1bOC';
+        case TerminalKey.arrowLeft:
+          return '\x1bOD';
+        case TerminalKey.home:
+          return '\x1bOH';
+        case TerminalKey.end:
+          return '\x1bOF';
+        default:
+          break;
+      }
+    }
+
+    // Standard word deletion shortcuts in terminal shells
+    if (event.key == TerminalKey.backspace) {
+      if (event.ctrl && !event.alt && !event.shift) {
+        return '\x17'; // Ctrl+W (backward-kill-word)
+      }
+      if (event.alt && !event.ctrl && !event.shift) {
+        return '\x1b\x7f'; // Alt+Backspace (backward-kill-word)
+      }
+    }
+
+    if (event.key == TerminalKey.delete) {
+      if (event.ctrl && !event.alt && !event.shift) {
+        return '\x1b[3;5~'; // Ctrl+Delete
+      }
+      if (event.alt && !event.ctrl && !event.shift) {
+        return '\x1bd'; // Alt+D (kill-word)
+      }
+    }
+
+    return null;
+  }
+}
+
 class SshSessionState {
   final ConnectionProfile profile;
   SSHClient? client;
   SSHSession? shell;
-  final Terminal terminal = Terminal(maxLines: 10000);
+  final Terminal terminal = Terminal(
+    maxLines: 10000,
+    inputHandler: const CascadeInputHandler([
+      CfsshTerminalInputHandler(),
+      defaultInputHandler,
+    ]),
+  );
   
   SshSessionStatus status = SshSessionStatus.disconnected;
   
@@ -285,18 +343,18 @@ class SshEngine extends ChangeNotifier {
 
   Future<SSHSession> startShell(String profileId, int cols, int rows) async {
     final state = _activeSessions[profileId];
-    if (state == null || state.client == null) {
-      throw Exception('Session not connected');
+    if (state == null || state.client == null || !state.isConnected) {
+      throw Exception(state?.error ?? 'Session not connected');
     }
     
+    state.lastCols = cols;
+    state.lastRows = rows;
+
     // If shell is already active, just return it and resize
     if (state.shell != null) {
       state.shell!.resizeTerminal(cols, rows, cols * 8, rows * 16);
       return state.shell!;
     }
-
-    state.lastCols = cols;
-    state.lastRows = rows;
 
     // PTY configuration for professional terminal layout
     state.shell = await state.client!.shell(

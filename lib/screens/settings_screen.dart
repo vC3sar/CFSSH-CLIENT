@@ -61,6 +61,16 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
+                  const Divider(color: AppColors.surfaceBorder, height: 1),
+                  SwitchListTile(
+                    title: const Text('Double-Tab Autocomplete'),
+                    subtitle: const Text('Press TAB twice to show command suggestions (letsencrypt, docker, certbot, etc.)'),
+                    activeThumbColor: AppColors.phosphorGreen,
+                    value: settings.enableDoubleTabAutocomplete,
+                    onChanged: (value) {
+                      settingsNotifier.setEnableDoubleTabAutocomplete(value);
+                    },
+                  ),
                 ],
               ),
             ),
