@@ -365,10 +365,12 @@ class _ProfileEditorState extends ConsumerState<_ProfileEditor> {
   @override
   Widget build(BuildContext context) {
     final keysState = ref.watch(keysProvider);
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+        bottom: bottomInset > 0 ? bottomInset : (bottomPadding + 16),
         left: 24,
         right: 24,
         top: 24,

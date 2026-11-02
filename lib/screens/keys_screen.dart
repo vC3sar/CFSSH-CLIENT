@@ -252,12 +252,14 @@ class _KeysScreenState extends ConsumerState<KeysScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
+        final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+        final bottomPadding = MediaQuery.of(context).padding.bottom;
         return Padding(
           padding: EdgeInsets.only(
             left: 24.0, 
             right: 24.0,
             top: 24.0,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24.0,
+            bottom: bottomInset > 0 ? bottomInset + 16.0 : (bottomPadding + 24.0),
           ),
           child: SingleChildScrollView(
             child: Column(

@@ -94,21 +94,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildBottomNav() {
     return Container(
-      height: 64,
       decoration: const BoxDecoration(
         color: AppColors.surface1,
         border: Border(
           top: BorderSide(color: AppColors.surfaceBorder, width: 0.8),
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem(0, Icons.dashboard_outlined, Icons.dashboard, 'Dashboard'),
-          _buildNavItem(1, Icons.dns_outlined, Icons.dns, 'Servers'),
-          _buildNavItem(2, Icons.folder_shared_outlined, Icons.folder_shared, 'Files'),
-          _buildNavItem(3, Icons.settings_outlined, Icons.settings, 'Settings'),
-        ],
+      child: SafeArea(
+        top: false,
+        left: false,
+        right: false,
+        bottom: true,
+        child: SizedBox(
+          height: 64,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(0, Icons.dashboard_outlined, Icons.dashboard, 'Dashboard'),
+              _buildNavItem(1, Icons.dns_outlined, Icons.dns, 'Servers'),
+              _buildNavItem(2, Icons.folder_shared_outlined, Icons.folder_shared, 'Files'),
+              _buildNavItem(3, Icons.settings_outlined, Icons.settings, 'Settings'),
+            ],
+          ),
+        ),
       ),
     );
   }

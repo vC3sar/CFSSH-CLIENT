@@ -84,6 +84,21 @@ if ($UploadTransfer) {
 # 4. Opcion: Subir a Discord vía Webhook (-UploadDiscord)
 if ($UploadDiscord) {
     if ([string]::IsNullOrWhiteSpace($DiscordWebhookUrl)) {
+        # Intentar leer desde .env si existe
+        $envFilePath = Join-Path $PSScriptRoot ".env"
+        if (Test-Path $envFilePath) {
+            Get-Content $envFilePath | ForEach-Object {
+                $line = $_.Trim()
+                if ($line -and -not $line.StartsWith("#")) {
+                    if ($line -match '^DISCORD_WEBHOOK_URL\s*=\s*["'']?(.*?)["'']?$') {
+                        $DiscordWebhookUrl = $matches[1].Trim()
+                    }
+                }
+            }
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($DiscordWebhookUrl)) {
         $DiscordWebhookUrl = Read-Host "Introduce tu Discord Webhook URL"
     }
     
